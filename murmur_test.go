@@ -1,8 +1,10 @@
 package murmur3
 
 import (
+	"crypto/rand"
 	"fmt"
 	"hash"
+	"io"
 	"testing"
 	"testing/quick"
 
@@ -52,28 +54,28 @@ func TestRef(t *testing.T) {
 		h64_byte.Write([]byte(elem.s))
 		target = fmt.Sprintf("%016x", elem.h64_1)
 		if p := fmt.Sprintf("%x", h64_byte.Sum(nil)); p != target {
-			t.Errorf("'%s': %s (want %s)", elem.s, p, target)
+			t.Errorf("Sum64: '%s': %s (want %s)", elem.s, p, target)
 		}
 
 		if v := Sum64([]byte(elem.s)); v != elem.h64_1 {
-			t.Errorf("'%s': 0x%x (want 0x%x)", elem.s, v, elem.h64_1)
+			t.Errorf("Sum64: '%s': 0x%x (want 0x%x)", elem.s, v, elem.h64_1)
 		}
 
 		var h128 Hash128 = New128()
 		h128.Write([]byte(elem.s))
 		if v1, v2 := h128.Sum128(); v1 != elem.h64_1 || v2 != elem.h64_2 {
-			t.Errorf("'%s': 0x%x-0x%x (want 0x%x-0x%x)", elem.s, v1, v2, elem.h64_1, elem.h64_2)
+			t.Errorf("New128: '%s': 0x%x-0x%x (want 0x%x-0x%x)", elem.s, v1, v2, elem.h64_1, elem.h64_2)
 		}
 
 		var h128_byte Hash128 = New128()
 		h128_byte.Write([]byte(elem.s))
 		target = fmt.Sprintf("%016x%016x", elem.h64_1, elem.h64_2)
 		if p := fmt.Sprintf("%x", h128_byte.Sum(nil)); p != target {
-			t.Errorf("'%s': %s (want %s)", elem.s, p, target)
+			t.Errorf("New128: '%s': %s (want %s)", elem.s, p, target)
 		}
 
 		if v1, v2 := Sum128([]byte(elem.s)); v1 != elem.h64_1 || v2 != elem.h64_2 {
-			t.Errorf("'%s': 0x%x-0x%x (want 0x%x-0x%x)", elem.s, v1, v2, elem.h64_1, elem.h64_2)
+			t.Errorf("Sum128: '%s': 0x%x-0x%x (want 0x%x-0x%x)", elem.s, v1, v2, elem.h64_1, elem.h64_2)
 		}
 	}
 }
@@ -113,25 +115,29 @@ func TestQuickSeedSum128(t *testing.T) {
 
 // TestBoundaries forces every block/tail path to be exercised for Sum32 and Sum128.
 func TestBoundaries(t *testing.T) {
-	for size := 0; size <= 17; size++ {
-		test := make([]byte, size)
-		g32h1 := Sum32(test)
-		c32h1 := testdata.SeedSum32(0, test)
-		if g32h1 != c32h1 {
-			t.Errorf("size #%d: g32h1 (%d) != c32h1 (%d)", size, g32h1, c32h1)
-		}
-		g64h1 := Sum64(test)
-		c64h1 := testdata.SeedSum64(0, test)
-		if g64h1 != c64h1 {
-			t.Errorf("size #%d: g64h1 (%d) != c64h1 (%d)", size, g64h1, c64h1)
-		}
-		g128h1, g128h2 := Sum128(test)
-		c128h1, c128h2 := testdata.SeedSum128(0, test)
-		if g128h1 != c128h1 {
-			t.Errorf("size #%d: g128h1 (%d) != c128h1 (%d)", size, g128h1, c128h1)
-		}
-		if g128h2 != c128h2 {
-			t.Errorf("size #%d: g128h2 (%d) != c128h2 (%d)", size, g128h2, c128h2)
+	var data [17]byte
+	for i := 0; !t.Failed() && i < 20; i++ {
+		io.ReadFull(rand.Reader, data[:])
+		for size := 0; size <= 17; size++ {
+			test := data[:size]
+			g32h1 := Sum32(test)
+			c32h1 := testdata.SeedSum32(0, test)
+			if g32h1 != c32h1 {
+				t.Errorf("size #%d: in: %x, g32h1 (%d) != c32h1 (%d); attempt #%d", size, test, g32h1, c32h1, i)
+			}
+			g64h1 := Sum64(test)
+			c64h1 := testdata.SeedSum64(0, test)
+			if g64h1 != c64h1 {
+				t.Errorf("size #%d: in: %x, g64h1 (%d) != c64h1 (%d); attempt #%d", size, test, g64h1, c64h1, i)
+			}
+			g128h1, g128h2 := Sum128(test)
+			c128h1, c128h2 := testdata.SeedSum128(0, test)
+			if g128h1 != c128h1 {
+				t.Errorf("size #%d: in: %x, g128h1 (%d) != c128h1 (%d); attempt #%d", size, test, g128h1, c128h1, i)
+			}
+			if g128h2 != c128h2 {
+				t.Errorf("size #%d: in: %x, g128h2 (%d) != c128h2 (%d); attempt #%d", size, test, g128h2, c128h2, i)
+			}
 		}
 	}
 }
@@ -269,7 +275,7 @@ func BenchmarkTail128_11(b *testing.B) {
 func BenchmarkTail128_12(b *testing.B) {
 	bench128(b, 12)
 }
-func BenchmarkTail123_13(b *testing.B) {
+func BenchmarkTail128_13(b *testing.B) {
 	bench128(b, 13)
 }
 func BenchmarkTail128_14(b *testing.B) {

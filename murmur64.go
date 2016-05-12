@@ -43,7 +43,7 @@ func (d *digest64) Sum64() uint64 {
 //     hasher.Write(data)
 //     return hasher.Sum64()
 func Sum64(data []byte) uint64 {
-	h1, _ := SeedSum128(0, 0, data)
+	h1, _ := Sum128(data)
 	return h1
 }
 
