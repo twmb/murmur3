@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"hash"
 	"testing"
+	"testing/quick"
+
+	"github.com/twmb/murmur3/testdata"
 )
 
 var data = []struct {
@@ -71,6 +74,64 @@ func TestRef(t *testing.T) {
 
 		if v1, v2 := Sum128([]byte(elem.s)); v1 != elem.h64_1 || v2 != elem.h64_2 {
 			t.Errorf("'%s': 0x%x-0x%x (want 0x%x-0x%x)", elem.s, v1, v2, elem.h64_1, elem.h64_2)
+		}
+	}
+}
+
+func TestQuickSeedSum32(t *testing.T) {
+	f := func(seed uint32, data []byte) bool {
+		goh1 := SeedSum32(seed, data)
+		cpph1 := testdata.SeedSum32(seed, data)
+		return goh1 == cpph1
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestQuickSeedSum64(t *testing.T) {
+	f := func(seed uint32, data []byte) bool {
+		goh1 := SeedSum64(uint64(seed), data)
+		cpph1 := testdata.SeedSum64(seed, data)
+		return goh1 == cpph1
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestQuickSeedSum128(t *testing.T) {
+	f := func(seed uint32, data []byte) bool {
+		goh1, goh2 := SeedSum128(uint64(seed), uint64(seed), data)
+		cpph1, cpph2 := testdata.SeedSum128(seed, data)
+		return goh1 == cpph1 && goh2 == cpph2
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+// TestBoundaries forces every block/tail path to be exercised for Sum32 and Sum128.
+func TestBoundaries(t *testing.T) {
+	for size := 0; size <= 17; size++ {
+		test := make([]byte, size)
+		g32h1 := Sum32(test)
+		c32h1 := testdata.SeedSum32(0, test)
+		if g32h1 != c32h1 {
+			t.Errorf("size #%d: g32h1 (%d) != c32h1 (%d)", size, g32h1, c32h1)
+		}
+		g64h1 := Sum64(test)
+		c64h1 := testdata.SeedSum64(0, test)
+		if g64h1 != c64h1 {
+			t.Errorf("size #%d: g64h1 (%d) != c64h1 (%d)", size, g64h1, c64h1)
+		}
+		g128h1, g128h2 := Sum128(test)
+		c128h1, c128h2 := testdata.SeedSum128(0, test)
+		if g128h1 != c128h1 {
+			t.Errorf("size #%d: g128h1 (%d) != c128h1 (%d)", size, g128h1, c128h1)
+		}
+		if g128h2 != c128h2 {
+			t.Errorf("size #%d: g128h2 (%d) != c128h2 (%d)", size, g128h2, c128h2)
 		}
 	}
 }
