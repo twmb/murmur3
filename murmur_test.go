@@ -171,47 +171,20 @@ func bench32(b *testing.B, length int) {
 	}
 }
 
-func Benchmark32_1(b *testing.B) {
-	bench32(b, 1)
+func BenchmarkBase32(b *testing.B) {
+	bench32(b, 0)
 }
-func Benchmark32_2(b *testing.B) {
-	bench32(b, 2)
-}
-func Benchmark32_4(b *testing.B) {
+func BenchmarkLoop32(b *testing.B) {
 	bench32(b, 4)
 }
-func Benchmark32_8(b *testing.B) {
-	bench32(b, 8)
+func BenchmarkTail32_1(b *testing.B) {
+	bench32(b, 1)
 }
-func Benchmark32_16(b *testing.B) {
-	bench32(b, 16)
+func BenchmarkTail32_2(b *testing.B) {
+	bench32(b, 2)
 }
-func Benchmark32_32(b *testing.B) {
-	bench32(b, 32)
-}
-func Benchmark32_64(b *testing.B) {
-	bench32(b, 64)
-}
-func Benchmark32_128(b *testing.B) {
-	bench32(b, 128)
-}
-func Benchmark32_256(b *testing.B) {
-	bench32(b, 256)
-}
-func Benchmark32_512(b *testing.B) {
-	bench32(b, 512)
-}
-func Benchmark32_1024(b *testing.B) {
-	bench32(b, 1024)
-}
-func Benchmark32_2048(b *testing.B) {
-	bench32(b, 2048)
-}
-func Benchmark32_4096(b *testing.B) {
-	bench32(b, 4096)
-}
-func Benchmark32_8192(b *testing.B) {
-	bench32(b, 8192)
+func BenchmarkTail32_3(b *testing.B) {
+	bench32(b, 3)
 }
 
 //---
@@ -219,40 +192,28 @@ func Benchmark32_8192(b *testing.B) {
 func benchPartial32(b *testing.B, length int) {
 	buf := make([]byte, length)
 	b.SetBytes(int64(length))
-
-	start := (32 / 8) / 2
-	chunks := 7
-	k := length / chunks
-	tail := (length - start) % k
-
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		hasher := New32()
-		hasher.Write(buf[0:start])
-
-		for j := start; j+k <= length; j += k {
-			hasher.Write(buf[j : j+k])
-		}
-
-		hasher.Write(buf[length-tail:])
+		hasher.Write(buf)
 		hasher.Sum32()
 	}
 }
 
-func BenchmarkPartial32_8(b *testing.B) {
-	benchPartial32(b, 8)
+func BenchmarkBasePartial32(b *testing.B) {
+	benchPartial32(b, 0)
 }
-func BenchmarkPartial32_16(b *testing.B) {
-	benchPartial32(b, 16)
+func BenchmarkLoopPartial32(b *testing.B) {
+	benchPartial32(b, 4)
 }
-func BenchmarkPartial32_32(b *testing.B) {
-	benchPartial32(b, 32)
+func BenchmarkTailPartial32_1(b *testing.B) {
+	benchPartial32(b, 1)
 }
-func BenchmarkPartial32_64(b *testing.B) {
-	benchPartial32(b, 64)
+func BenchmarkTailPartial32_2(b *testing.B) {
+	benchPartial32(b, 2)
 }
-func BenchmarkPartial32_128(b *testing.B) {
-	benchPartial32(b, 128)
+func BenchmarkTailPartial32_3(b *testing.B) {
+	benchPartial32(b, 3)
 }
 
 //---
@@ -266,47 +227,56 @@ func bench128(b *testing.B, length int) {
 	}
 }
 
-func Benchmark128_1(b *testing.B) {
-	bench128(b, 1)
+func BenchmarkBase128(b *testing.B) {
+	bench128(b, 0)
 }
-func Benchmark128_2(b *testing.B) {
-	bench128(b, 2)
-}
-func Benchmark128_4(b *testing.B) {
-	bench128(b, 4)
-}
-func Benchmark128_8(b *testing.B) {
-	bench128(b, 8)
-}
-func Benchmark128_16(b *testing.B) {
+func BenchmarkLoop128(b *testing.B) {
 	bench128(b, 16)
 }
-func Benchmark128_32(b *testing.B) {
-	bench128(b, 32)
+func BenchmarkTail128_1(b *testing.B) {
+	bench128(b, 1)
 }
-func Benchmark128_64(b *testing.B) {
-	bench128(b, 64)
+func BenchmarkTail128_2(b *testing.B) {
+	bench128(b, 2)
 }
-func Benchmark128_128(b *testing.B) {
-	bench128(b, 128)
+func BenchmarkTail128_3(b *testing.B) {
+	bench128(b, 3)
 }
-func Benchmark128_256(b *testing.B) {
-	bench128(b, 256)
+func BenchmarkTail128_4(b *testing.B) {
+	bench128(b, 4)
 }
-func Benchmark128_512(b *testing.B) {
-	bench128(b, 512)
+func BenchmarkTail128_5(b *testing.B) {
+	bench128(b, 5)
 }
-func Benchmark128_1024(b *testing.B) {
-	bench128(b, 1024)
+func BenchmarkTail128_6(b *testing.B) {
+	bench128(b, 6)
 }
-func Benchmark128_2048(b *testing.B) {
-	bench128(b, 2048)
+func BenchmarkTail128_7(b *testing.B) {
+	bench128(b, 7)
 }
-func Benchmark128_4096(b *testing.B) {
-	bench128(b, 4096)
+func BenchmarkTail128_8(b *testing.B) {
+	bench128(b, 8)
 }
-func Benchmark128_8192(b *testing.B) {
-	bench128(b, 8192)
+func BenchmarkTail128_9(b *testing.B) {
+	bench128(b, 9)
+}
+func BenchmarkTail128_10(b *testing.B) {
+	bench128(b, 10)
+}
+func BenchmarkTail128_11(b *testing.B) {
+	bench128(b, 11)
+}
+func BenchmarkTail128_12(b *testing.B) {
+	bench128(b, 12)
+}
+func BenchmarkTail123_13(b *testing.B) {
+	bench128(b, 13)
+}
+func BenchmarkTail128_14(b *testing.B) {
+	bench128(b, 14)
+}
+func BenchmarkTail128_15(b *testing.B) {
+	bench128(b, 15)
 }
 
 //---
