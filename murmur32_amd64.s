@@ -44,7 +44,7 @@ loop:
 	ROLL $13, R12
 	LEAL 0xe6546b64(R12)(R12*4), R12
 
-	JNE loop
+	JMP loop
 
 tail:
 	MOVQ R9, CX
