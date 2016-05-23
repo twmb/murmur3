@@ -80,10 +80,32 @@ func TestRef(t *testing.T) {
 	}
 }
 
+func TestQuickSum32(t *testing.T) {
+	f := func(data []byte) bool {
+		goh1 := Sum32(data)
+		cpph1 := testdata.SeedSum32(0, data)
+		return goh1 == cpph1
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestQuickSeedSum32(t *testing.T) {
 	f := func(seed uint32, data []byte) bool {
 		goh1 := SeedSum32(seed, data)
 		cpph1 := testdata.SeedSum32(seed, data)
+		return goh1 == cpph1
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestQuickSum64(t *testing.T) {
+	f := func(data []byte) bool {
+		goh1 := Sum64(data)
+		cpph1 := testdata.SeedSum64(0, data)
 		return goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
@@ -96,6 +118,17 @@ func TestQuickSeedSum64(t *testing.T) {
 		goh1 := SeedSum64(uint64(seed), data)
 		cpph1 := testdata.SeedSum64(seed, data)
 		return goh1 == cpph1
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestQuickSum128(t *testing.T) {
+	f := func(data []byte) bool {
+		goh1, goh2 := Sum128(data)
+		cpph1, cpph2 := testdata.SeedSum128(0, data)
+		return goh1 == cpph1 && goh2 == cpph2
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
@@ -115,22 +148,32 @@ func TestQuickSeedSum128(t *testing.T) {
 
 // TestBoundaries forces every block/tail path to be exercised for Sum32 and Sum128.
 func TestBoundaries(t *testing.T) {
-	var data [17]byte
+	const maxCheck = 17
+	var data [maxCheck]byte
 	for i := 0; !t.Failed() && i < 20; i++ {
-		io.ReadFull(rand.Reader, data[:])
-		for size := 0; size <= 17; size++ {
+		// Check all zeros the first iteration.
+		for size := 0; size <= maxCheck; size++ {
 			test := data[:size]
 			g32h1 := Sum32(test)
+			g32h1s := SeedSum32(0, test)
 			c32h1 := testdata.SeedSum32(0, test)
 			if g32h1 != c32h1 {
 				t.Errorf("size #%d: in: %x, g32h1 (%d) != c32h1 (%d); attempt #%d", size, test, g32h1, c32h1, i)
 			}
+			if g32h1s != c32h1 {
+				t.Errorf("size #%d: in: %x, gh32h1s (%d) != c32h1 (%d); attempt #%d", size, test, g32h1s, c32h1, i)
+			}
 			g64h1 := Sum64(test)
+			g64h1s := SeedSum64(0, test)
 			c64h1 := testdata.SeedSum64(0, test)
 			if g64h1 != c64h1 {
 				t.Errorf("size #%d: in: %x, g64h1 (%d) != c64h1 (%d); attempt #%d", size, test, g64h1, c64h1, i)
 			}
+			if g64h1s != c64h1 {
+				t.Errorf("size #%d: in: %x, g64h1s (%d) != c64h1 (%d); attempt #%d", size, test, g64h1s, c64h1, i)
+			}
 			g128h1, g128h2 := Sum128(test)
+			g128h1s, g128h2s := SeedSum128(0, 0, test)
 			c128h1, c128h2 := testdata.SeedSum128(0, test)
 			if g128h1 != c128h1 {
 				t.Errorf("size #%d: in: %x, g128h1 (%d) != c128h1 (%d); attempt #%d", size, test, g128h1, c128h1, i)
@@ -138,7 +181,15 @@ func TestBoundaries(t *testing.T) {
 			if g128h2 != c128h2 {
 				t.Errorf("size #%d: in: %x, g128h2 (%d) != c128h2 (%d); attempt #%d", size, test, g128h2, c128h2, i)
 			}
+			if g128h1s != c128h1 {
+				t.Errorf("size #%d: in: %x, g128h1s (%d) != c128h1 (%d); attempt #%d", size, test, g128h1s, c128h1, i)
+			}
+			if g128h2s != c128h2 {
+				t.Errorf("size #%d: in: %x, g128h2s (%d) != c128h2 (%d); attempt #%d", size, test, g128h2s, c128h2, i)
+			}
 		}
+		// Randomize the data for all subsequent tests.
+		io.ReadFull(rand.Reader, data[:])
 	}
 }
 
