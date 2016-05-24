@@ -53,9 +53,8 @@ tail:
 
 	XORQ AX, AX
 
-	DECL CX
-	JZ   tail1
-	DECL CX
+	SUBQ $2, CX
+	JL   tail1
 	JZ   tail2
 
 tail3:  // no jump
