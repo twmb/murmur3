@@ -85,37 +85,39 @@ tail:
 
 	XORQ AX, AX
 
-	// poor man's jump table
-	DECQ CX
-	JZ   tail1
-	DECQ CX
-	JZ   tail2
-	DECQ CX
-	JZ   tail3
-	DECQ CX
-	JZ   tail4
-	DECQ CX
-	JZ   tail5
-	DECQ CX
-	JZ   tail6
-	DECQ CX
-	JZ   tail7
-	DECQ CX
+	// poor man's btree jump table
+	SUBQ $8, CX
 	JZ   tail8
-	DECQ CX
-	JZ   tail9
-	DECQ CX
-	JZ   tail10
-	DECQ CX
-	JZ   tail11
-	DECQ CX
+	JG   over8
+	ADDQ $4, CX
+	JZ   tail4
+	JG   over4
+	ADDQ $2, CX
+	JL   tail1
+	JZ   tail2
+	JMP  tail3
+
+over4:
+	SUBQ $2, CX
+	JL   tail5
+	JZ   tail6
+	JMP  tail7
+
+over8:
+	SUBQ $4, CX
 	JZ   tail12
-	DECQ CX
-	JZ   tail13
-	DECQ CX
+	JG   over12
+	ADDQ $2, CX
+	JL   tail9
+	JZ   tail10
+	JMP  tail11
+
+over12:
+	SUBQ $2, CX
+	JL   tail13
 	JZ   tail14
 
-tail15:  // no jump
+tail15:
 	MOVBQZX 14(SI)(BP*1), AX
 	SALQ    $16, AX
 
