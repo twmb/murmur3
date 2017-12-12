@@ -54,3 +54,15 @@ func SeedSum64(seed uint64, data []byte) uint64 {
 	h1, _ := SeedSum128(seed, seed, data)
 	return h1
 }
+
+// StringSum64 is the string version of Sum64.
+func StringSum64(data string) uint64 {
+	h1, _ := StringSum128(data)
+	return h1
+}
+
+// SeedStringSum64 is the string version of SeedSum64.
+func SeedStringSum64(seed uint64, data string) uint64 {
+	h1, _ := SeedStringSum128(seed, seed, data)
+	return h1
+}

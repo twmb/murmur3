@@ -13,3 +13,9 @@ func Sum128(data []byte) (h1 uint64, h2 uint64)
 // seed1 and seed2. The canonical implementation allows one uint32 seed; to
 // imitate that behavior, use the same, uint32-max seed for seed1 and seed2.
 func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64)
+
+// StringSum128 is the string version of Sum128.
+func StringSum128(data string) (h1 uint64, h2 uint64)
+
+// SeedStringSum128 is the string version of SeedSum128.
+func SeedStringSum128(seed1, seed2 uint64, data string) (h1 uint64, h2 uint64)

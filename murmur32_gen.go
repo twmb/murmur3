@@ -4,6 +4,16 @@ package murmur3
 
 import "unsafe"
 
+// StringSum32 is the string version of Sum32.
+func StringSum32(data string) uint32 {
+	return SeedSum32(0, quickslice(data))
+}
+
+// SeedStringSum32 is the string version of SeedSum32.
+func SeedStringSum32(seed uint32, data string) (h1 uint32) {
+	return SeedSum32(seed, quickslice(data))
+}
+
 // Sum32 returns the MurmurHash3 sum of data. It is equivalent to the
 // following sequence (without the extra burden and the extra allocation):
 //     hasher := New32()

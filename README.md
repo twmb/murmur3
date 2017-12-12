@@ -7,6 +7,8 @@ MurmurHash3).
 Includes assembly for amd64 (go 1.5+), the benchmarks of which can be seen in
 PR [#1](https://github.com/twmb/murmur3/pull/1).
 
+Also includes string summing functions to avoid string to slice conversions.
+
 Reference algorithm has been slightly hacked as to support the streaming mode
 required by Go's standard [Hash interface](http://golang.org/pkg/hash/#Hash).
 

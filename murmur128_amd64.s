@@ -34,6 +34,24 @@ TEXT ·Sum128(SB), $0-40
 	LEAQ h1+24(FP), BX
 	JMP  sum128internal<>(SB)
 
+// SeedStringSum128(seed1, seed2 uint64, data string) (h1 uint64, h2 uint64)
+TEXT ·SeedStringSum128(SB), $0-48
+	MOVQ seed1+0(FP), R12
+	MOVQ seed2+8(FP), R13
+	MOVQ data_base+16(FP), SI
+	MOVQ data_len+24(FP), R9
+	LEAQ h1+32(FP), BX
+	JMP  sum128internal<>(SB)
+
+// StringSum128(data string) (h1 uint64, h2 uint64)
+TEXT ·StringSum128(SB), $0-32
+	XORQ R12, R12
+	XORQ R13, R13
+	MOVQ data_base+0(FP), SI
+	MOVQ data_len+8(FP), R9
+	LEAQ h1+16(FP), BX
+	JMP  sum128internal<>(SB)
+
 // Expects:
 // R12 == h1 uint64 seed
 // R13 == h2 uint64 seed

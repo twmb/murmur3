@@ -4,6 +4,16 @@ package murmur3
 
 import "unsafe"
 
+// StringSum128 is the string version of Sum128.
+func StringSum128(data string) (h1 uint64, h2 uint64) {
+	return SeedSum128(0, 0, quickslice(data))
+}
+
+// SeedStringSum128 is the string version of SeedSum128.
+func SeedStringSum128(seed1, seed2 uint64, data string) (h1 uint64, h2 uint64) {
+	return SeedSum128(seed1, seed2, quickslice(data))
+}
+
 // Sum128 returns the MurmurHash3 sum of data. It is equivalent to the
 // following sequence (without the extra burden and the extra allocation):
 //     hasher := New128()
