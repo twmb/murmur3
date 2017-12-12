@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// package murmur3 provides a fast, native implementations of Austin Appleby's
-// non-cryptographic MurmurHash3 alrogithm.
+// Package murmur3 provides an amd64 native (Go generic fallback)
+// implementation of the murmur3 hash algorithm for strings and slices.
 //
 // Assembly is provided for amd64 go1.5+; pull requests are welcome for other
 // architectures.
