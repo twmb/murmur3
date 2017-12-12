@@ -4,8 +4,18 @@ package murmur3
 
 import "unsafe"
 
-// Sum32 returns the MurmurHash3 sum of data. It is equivalent to the
-// following sequence (without the extra burden and the extra allocation):
+// StringSum32 is the string version of Sum32.
+func StringSum32(data string) uint32 {
+	return SeedSum32(0, quickslice(data))
+}
+
+// SeedStringSum32 is the string version of SeedSum32.
+func SeedStringSum32(seed uint32, data string) (h1 uint32) {
+	return SeedSum32(seed, quickslice(data))
+}
+
+// Sum32 returns the murmur3 sum of data. It is equivalent to the following
+// sequence (without the extra burden and the extra allocation):
 //     hasher := New32()
 //     hasher.Write(data)
 //     return hasher.Sum32()
@@ -13,7 +23,7 @@ func Sum32(data []byte) uint32 {
 	return SeedSum32(0, data)
 }
 
-// SeedSum32 returns the MurmurHash3 sum of data with the digest initialized to
+// SeedSum32 returns the murmur3 sum of data with the digest initialized to
 // seed.
 func SeedSum32(seed uint32, data []byte) (h1 uint32) {
 	h1 = seed

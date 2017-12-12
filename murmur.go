@@ -2,12 +2,17 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// package murmur3 provides a fast, native implementations of Austin Appleby's
-// non-cryptographic MurmurHash3 alrogithm.
+// Package murmur3 provides an amd64 native (Go generic fallback)
+// implementation of the murmur3 hash algorithm for strings and slices.
 //
 // Assembly is provided for amd64 go1.5+; pull requests are welcome for other
 // architectures.
 package murmur3
+
+import (
+	"reflect"
+	"unsafe"
+)
 
 type bmixer interface {
 	bmix(p []byte) (tail []byte)
@@ -55,4 +60,14 @@ func (d *digest) Reset() {
 	d.clen = 0
 	d.tail = nil
 	d.bmixer.reset()
+}
+
+func quickslice(str string) []byte {
+	var slice []byte
+	*(*reflect.SliceHeader)(unsafe.Pointer(&slice)) = reflect.SliceHeader{
+		Data: ((*reflect.StringHeader)(unsafe.Pointer(&str))).Data,
+		Len:  len(str),
+		Cap:  len(str),
+	}
+	return slice
 }

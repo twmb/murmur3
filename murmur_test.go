@@ -83,8 +83,9 @@ func TestRef(t *testing.T) {
 func TestQuickSum32(t *testing.T) {
 	f := func(data []byte) bool {
 		goh1 := Sum32(data)
+		goh2 := StringSum32(string(data))
 		cpph1 := testdata.SeedSum32(0, data)
-		return goh1 == cpph1
+		return goh1 == goh2 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
@@ -94,8 +95,9 @@ func TestQuickSum32(t *testing.T) {
 func TestQuickSeedSum32(t *testing.T) {
 	f := func(seed uint32, data []byte) bool {
 		goh1 := SeedSum32(seed, data)
+		goh2 := SeedStringSum32(seed, string(data))
 		cpph1 := testdata.SeedSum32(seed, data)
-		return goh1 == cpph1
+		return goh1 == goh2 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
@@ -105,8 +107,9 @@ func TestQuickSeedSum32(t *testing.T) {
 func TestQuickSum64(t *testing.T) {
 	f := func(data []byte) bool {
 		goh1 := Sum64(data)
+		goh2 := StringSum64(string(data))
 		cpph1 := testdata.SeedSum64(0, data)
-		return goh1 == cpph1
+		return goh1 == goh2 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
@@ -116,8 +119,9 @@ func TestQuickSum64(t *testing.T) {
 func TestQuickSeedSum64(t *testing.T) {
 	f := func(seed uint32, data []byte) bool {
 		goh1 := SeedSum64(uint64(seed), data)
+		goh2 := SeedStringSum64(uint64(seed), string(data))
 		cpph1 := testdata.SeedSum64(seed, data)
-		return goh1 == cpph1
+		return goh1 == goh2 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
@@ -127,8 +131,9 @@ func TestQuickSeedSum64(t *testing.T) {
 func TestQuickSum128(t *testing.T) {
 	f := func(data []byte) bool {
 		goh1, goh2 := Sum128(data)
+		goh3, goh4 := StringSum128(string(data))
 		cpph1, cpph2 := testdata.SeedSum128(0, data)
-		return goh1 == cpph1 && goh2 == cpph2
+		return goh1 == goh3 && goh2 == goh4 && goh1 == cpph1 && goh2 == cpph2
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
@@ -138,8 +143,9 @@ func TestQuickSum128(t *testing.T) {
 func TestQuickSeedSum128(t *testing.T) {
 	f := func(seed uint32, data []byte) bool {
 		goh1, goh2 := SeedSum128(uint64(seed), uint64(seed), data)
+		goh3, goh4 := SeedStringSum128(uint64(seed), uint64(seed), string(data))
 		cpph1, cpph2 := testdata.SeedSum128(seed, data)
-		return goh1 == cpph1 && goh2 == cpph2
+		return goh1 == goh3 && goh2 == goh4 && goh1 == cpph1 && goh2 == cpph2
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)

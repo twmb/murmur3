@@ -16,6 +16,22 @@ TEXT ·SeedSum32(SB), $0-36
 	LEAQ h1+32(FP), BX
 	JMP  sum32internal<>(SB)
 
+// StringSum32(data string) (h1 uint32)
+TEXT ·StringSum32(SB), $0-20
+	MOVQ data_base+0(FP), SI
+	MOVQ data_len+8(FP), R9
+	XORL R12, R12
+	LEAQ h1+16(FP), BX
+	JMP  sum32internal<>(SB)
+
+// SeedStringSum32(seed uint32, data string) (h1 uint32)
+TEXT ·SeedStringSum32(SB), $0-28
+	MOVL seed+0(FP), R12
+	MOVQ data_base+8(FP), SI
+	MOVQ data_len+16(FP), R9
+	LEAQ h1+24(FP), BX
+	JMP  sum32internal<>(SB)
+
 #define c1_32 0xcc9e2d51
 #define c2_32 0x1b873593
 
