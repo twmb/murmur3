@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"strconv"
 	"testing"
 	"testing/quick"
 
@@ -223,123 +224,91 @@ func TestIncremental(t *testing.T) {
 	}
 }
 
-//---
+// Our lengths force 1) the function base itself (no loop/tail), 2) remainders
+// and 3) the loop itself.
 
-func bench32(b *testing.B, length int) {
-	buf := make([]byte, length)
-	b.SetBytes(int64(length))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		Sum32(buf)
+func Benchmark32Branches(b *testing.B) {
+	for length := 0; length <= 4; length++ {
+		b.Run(strconv.Itoa(length), func(b *testing.B) {
+			buf := make([]byte, length)
+			b.SetBytes(int64(length))
+			b.ResetTimer()
+			for length := 0; length < b.N; length++ {
+				Sum32(buf)
+			}
+		})
 	}
 }
 
-func BenchmarkBase32(b *testing.B) {
-	bench32(b, 0)
-}
-func BenchmarkLoop32(b *testing.B) {
-	bench32(b, 4)
-}
-func BenchmarkTail32_1(b *testing.B) {
-	bench32(b, 1)
-}
-func BenchmarkTail32_2(b *testing.B) {
-	bench32(b, 2)
-}
-func BenchmarkTail32_3(b *testing.B) {
-	bench32(b, 3)
-}
-
-//---
-
-func benchPartial32(b *testing.B, length int) {
-	buf := make([]byte, length)
-	b.SetBytes(int64(length))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		hasher := New32()
-		hasher.Write(buf)
-		hasher.Sum32()
+func BenchmarkPartial32Branches(b *testing.B) {
+	for length := 0; length <= 4; length++ {
+		b.Run(strconv.Itoa(length), func(b *testing.B) {
+			buf := make([]byte, length)
+			b.SetBytes(int64(length))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				hasher := New32()
+				hasher.Write(buf)
+				hasher.Sum32()
+			}
+		})
 	}
 }
 
-func BenchmarkBasePartial32(b *testing.B) {
-	benchPartial32(b, 0)
-}
-func BenchmarkLoopPartial32(b *testing.B) {
-	benchPartial32(b, 4)
-}
-func BenchmarkTailPartial32_1(b *testing.B) {
-	benchPartial32(b, 1)
-}
-func BenchmarkTailPartial32_2(b *testing.B) {
-	benchPartial32(b, 2)
-}
-func BenchmarkTailPartial32_3(b *testing.B) {
-	benchPartial32(b, 3)
-}
-
-//---
-
-func bench128(b *testing.B, length int) {
-	buf := make([]byte, length)
-	b.SetBytes(int64(length))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		Sum128(buf)
+func Benchmark128Branches(b *testing.B) {
+	for length := 0; length <= 16; length++ {
+		b.Run(strconv.Itoa(length), func(b *testing.B) {
+			buf := make([]byte, length)
+			b.SetBytes(int64(length))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				Sum128(buf)
+			}
+		})
 	}
 }
 
-func BenchmarkBase128(b *testing.B) {
-	bench128(b, 0)
-}
-func BenchmarkLoop128(b *testing.B) {
-	bench128(b, 16)
-}
-func BenchmarkTail128_1(b *testing.B) {
-	bench128(b, 1)
-}
-func BenchmarkTail128_2(b *testing.B) {
-	bench128(b, 2)
-}
-func BenchmarkTail128_3(b *testing.B) {
-	bench128(b, 3)
-}
-func BenchmarkTail128_4(b *testing.B) {
-	bench128(b, 4)
-}
-func BenchmarkTail128_5(b *testing.B) {
-	bench128(b, 5)
-}
-func BenchmarkTail128_6(b *testing.B) {
-	bench128(b, 6)
-}
-func BenchmarkTail128_7(b *testing.B) {
-	bench128(b, 7)
-}
-func BenchmarkTail128_8(b *testing.B) {
-	bench128(b, 8)
-}
-func BenchmarkTail128_9(b *testing.B) {
-	bench128(b, 9)
-}
-func BenchmarkTail128_10(b *testing.B) {
-	bench128(b, 10)
-}
-func BenchmarkTail128_11(b *testing.B) {
-	bench128(b, 11)
-}
-func BenchmarkTail128_12(b *testing.B) {
-	bench128(b, 12)
-}
-func BenchmarkTail128_13(b *testing.B) {
-	bench128(b, 13)
-}
-func BenchmarkTail128_14(b *testing.B) {
-	bench128(b, 14)
-}
-func BenchmarkTail128_15(b *testing.B) {
-	bench128(b, 15)
+// Sizes below pick up where branches left off to demonstrate speed at larger
+// slice sizes.
+
+func Benchmark32Sizes(b *testing.B) {
+	buf := make([]byte, 8192)
+	for length := 32; length <= cap(buf); length *= 2 {
+		b.Run(strconv.Itoa(length), func(b *testing.B) {
+			buf = buf[:length]
+			b.SetBytes(int64(length))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				Sum32(buf)
+			}
+		})
+	}
 }
 
-//---
+func Benchmark64Sizes(b *testing.B) {
+	buf := make([]byte, 8192)
+	for length := 32; length <= cap(buf); length *= 2 {
+		b.Run(strconv.Itoa(length), func(b *testing.B) {
+			buf = buf[:length]
+			b.SetBytes(int64(length))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				Sum64(buf)
+			}
+		})
+	}
+}
+
+func Benchmark128Sizes(b *testing.B) {
+	buf := make([]byte, 8192)
+	for length := 32; length <= cap(buf); length *= 2 {
+		b.Run(strconv.Itoa(length), func(b *testing.B) {
+			buf = buf[:length]
+			b.SetBytes(int64(length))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				Sum128(buf)
+			}
+		})
+	}
+}
