@@ -1,21 +1,5 @@
 // +build go1.5,amd64
 
-// uses DX
-#define fmix64(k) \
-	MOVQ  k, DX                   \
-	SHRQ  $33, DX                 \
-	XORQ  DX, k                   \
-	MOVQ  $0xff51afd7ed558ccd, DX \
-	IMULQ DX, k                   \
-	MOVQ  k, DX                   \
-	SHRQ  $33, DX                 \
-	XORQ  DX, k                   \
-	MOVQ  $0xc4ceb9fe1a85ec53, DX \
-	IMULQ DX, k                   \
-	MOVQ  k, DX                   \
-	SHRQ  $33, DX                 \
-	XORQ  DX, k                   \
-
 // SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64)
 TEXT ·SeedSum128(SB), $0-56
 	MOVQ seed1+0(FP), R12
@@ -76,20 +60,20 @@ loop:
 	ADDQ $16, BP
 
 	IMULQ R14, AX
+	IMULQ R15, DX
+
 	ROLQ  $31, AX
+	ROLQ  $33, DX
+
 	IMULQ R15, AX
+	IMULQ R14, DX
 
-	XORQ AX, R12
-
+	XORQ AX,  R12
 	ROLQ $27, R12
 	ADDQ R13, R12
 	LEAQ 0x52dce729(R12)(R12*4), R12
 
-	IMULQ R15, DX
-	ROLQ  $33, DX
-	IMULQ R14, DX
-	XORQ  DX, R13
-
+	XORQ DX,  R13
 	ROLQ $31, R13
 	ADDQ R12, R13
 	LEAQ 0x38495ab5(R13)(R13*4), R13
@@ -103,7 +87,7 @@ tail:
 
 	XORQ AX, AX
 
-	// poor man's btree jump table
+	// poor man's binary tree jump table
 	SUBQ $8, CX
 	JZ   tail8
 	JG   over8
@@ -212,11 +196,47 @@ fintaillow:
 finalize:
 	XORQ R9, R12
 	XORQ R9, R13
+
 	ADDQ R13, R12
 	ADDQ R12, R13
 
-	fmix64(R12)
-	fmix64(R13)
+	// fmix128 (both interleaved)
+	MOVQ  R12, DX
+	MOVQ  R13, AX
+
+	SHRQ  $33, DX
+	SHRQ  $33, AX
+
+	XORQ  DX, R12
+	XORQ  AX, R13
+
+	MOVQ  $0xff51afd7ed558ccd, CX
+
+	IMULQ CX, R12
+	IMULQ CX, R13
+
+	MOVQ  R12, DX
+	MOVQ  R13, AX
+
+	SHRQ  $33, DX
+	SHRQ  $33, AX
+
+	XORQ  DX, R12
+	XORQ  AX, R13
+
+	MOVQ  $0xc4ceb9fe1a85ec53, CX
+
+	IMULQ CX, R12
+	IMULQ CX, R13
+
+	MOVQ  R12, DX
+	MOVQ  R13, AX
+
+	SHRQ  $33, DX
+	SHRQ  $33, AX
+
+	XORQ  DX, R12
+	XORQ  AX, R13
 
 	ADDQ R13, R12
 	ADDQ R12, R13
