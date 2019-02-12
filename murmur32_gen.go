@@ -1,5 +1,3 @@
-// +build !go1.5 !amd64
-
 package murmur3
 
 import "unsafe"
