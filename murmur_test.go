@@ -312,3 +312,17 @@ func Benchmark128Sizes(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkNoescape32(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		var buf [8192]byte
+		Sum32(buf[:])
+	}
+}
+
+func BenchmarkNoescape128(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		var buf [8192]byte
+		Sum128(buf[:])
+	}
+}
