@@ -19,13 +19,14 @@ const (
 // digest32 represents a partial evaluation of a 32 bites hash.
 type digest32 struct {
 	digest
-	h1 uint32 // Unfinalized running hash.
+	seed uint32
+	h1   uint32 // Unfinalized running hash.
 }
 
 // SeedNew32 returns a hash.Hash32 for streaming 32 bit sums with its internal
 // digest initialized to seed.
 func SeedNew32(seed uint32) hash.Hash32 {
-	d := &digest32{h1: seed}
+	d := &digest32{seed: seed}
 	d.bmixer = d
 	d.Reset()
 	return d
@@ -38,7 +39,7 @@ func New32() hash.Hash32 {
 
 func (d *digest32) Size() int { return 4 }
 
-func (d *digest32) reset() { d.h1 = 0 }
+func (d *digest32) reset() { d.h1 = d.seed }
 
 func (d *digest32) Sum(b []byte) []byte {
 	h := d.Sum32()

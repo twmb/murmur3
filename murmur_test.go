@@ -2,6 +2,7 @@ package murmur3
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"hash"
 	"io"
@@ -97,8 +98,9 @@ func TestQuickSeedSum32(t *testing.T) {
 	f := func(seed uint32, data []byte) bool {
 		goh1 := SeedSum32(seed, data)
 		goh2 := SeedStringSum32(seed, string(data))
+		goh3 := func() uint32 { h := SeedNew32(seed); h.Write(data); return binary.BigEndian.Uint32(h.Sum(nil)) }()
 		cpph1 := testdata.SeedSum32(seed, data)
-		return goh1 == goh2 && goh1 == cpph1
+		return goh1 == goh2 && goh1 == goh3 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
@@ -121,8 +123,9 @@ func TestQuickSeedSum64(t *testing.T) {
 	f := func(seed uint32, data []byte) bool {
 		goh1 := SeedSum64(uint64(seed), data)
 		goh2 := SeedStringSum64(uint64(seed), string(data))
+		goh3 := func() uint64 { h := SeedNew64(uint64(seed)); h.Write(data); return binary.BigEndian.Uint64(h.Sum(nil)) }()
 		cpph1 := testdata.SeedSum64(seed, data)
-		return goh1 == goh2 && goh1 == cpph1
+		return goh1 == goh2 && goh1 == goh3 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
@@ -145,8 +148,16 @@ func TestQuickSeedSum128(t *testing.T) {
 	f := func(seed uint32, data []byte) bool {
 		goh1, goh2 := SeedSum128(uint64(seed), uint64(seed), data)
 		goh3, goh4 := SeedStringSum128(uint64(seed), uint64(seed), string(data))
+		goh5, goh6 := func() (uint64, uint64) {
+			h := SeedNew128(uint64(seed), uint64(seed))
+			h.Write(data)
+			sum := h.Sum(nil)
+			return binary.BigEndian.Uint64(sum), binary.BigEndian.Uint64(sum[8:])
+		}()
 		cpph1, cpph2 := testdata.SeedSum128(seed, data)
-		return goh1 == goh3 && goh2 == goh4 && goh1 == cpph1 && goh2 == cpph2
+		return goh1 == goh3 && goh2 == goh4 &&
+			goh1 == goh5 && goh2 == goh6 &&
+			goh1 == cpph1 && goh2 == cpph2
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
