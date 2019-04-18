@@ -26,8 +26,10 @@ type Hash128 interface {
 // digest128 represents a partial evaluation of a 128 bites hash.
 type digest128 struct {
 	digest
-	h1 uint64 // Unfinalized running hash part 1.
-	h2 uint64 // Unfinalized running hash part 2.
+	seed1 uint64
+	seed2 uint64
+	h1    uint64 // Unfinalized running hash part 1.
+	h2    uint64 // Unfinalized running hash part 2.
 }
 
 // SeedNew128 returns a Hash128 for streaming 128 bit sums with its internal
@@ -36,7 +38,7 @@ type digest128 struct {
 // The canonical implementation allows one only uint32 seed; to imitate that
 // behavior, use the same, uint32-max seed for seed1 and seed2.
 func SeedNew128(seed1, seed2 uint64) Hash128 {
-	d := &digest128{h1: seed1, h2: seed2}
+	d := &digest128{seed1: seed1, seed2: seed2}
 	d.bmixer = d
 	d.Reset()
 	return d
@@ -49,7 +51,7 @@ func New128() Hash128 {
 
 func (d *digest128) Size() int { return 16 }
 
-func (d *digest128) reset() { d.h1, d.h2 = 0, 0 }
+func (d *digest128) reset() { d.h1, d.h2 = d.seed1, d.seed2 }
 
 func (d *digest128) Sum(b []byte) []byte {
 	h1, h2 := d.Sum128()
