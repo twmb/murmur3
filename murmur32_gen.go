@@ -1,6 +1,12 @@
 package murmur3
 
-import "unsafe"
+const (
+	c1 uint32 = 0xcc9e2d51
+	c2 uint32 = 0x1b873593
+	c3 uint32 = 0x85ebca6b
+	c4 uint32 = 0xc2b2ae35
+	c5 uint32 = 0xe6546b64
+)
 
 // StringSum32 is the string version of Sum32.
 func StringSum32(data string) uint32 {
@@ -25,43 +31,38 @@ func Sum32(data []byte) uint32 {
 // seed.
 func SeedSum32(seed uint32, data []byte) (h1 uint32) {
 	h1 = seed
-	nblocks := len(data) / 4
-	for i := 0; i < nblocks; i++ {
-		k1 := *(*uint32)(unsafe.Pointer(&data[i*4]))
+	dataLen := len(data)
 
-		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
-		k1 *= c2_32
-
-		h1 ^= k1
-		h1 = (h1 << 13) | (h1 >> 19) // rotl32(*h1, 13)
-		h1 = h1*5 + 0xe6546b64
-	}
-	clen := uint32(len(data))
-	tail := data[nblocks<<2:]
-	var k1 uint32
-	switch len(tail) & 3 {
-	case 3:
-		k1 ^= uint32(tail[2]) << 16
-		fallthrough
-	case 2:
-		k1 ^= uint32(tail[1]) << 8
-		fallthrough
-	case 1:
-		k1 ^= uint32(tail[0])
-		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
-		k1 *= c2_32
-		h1 ^= k1
+	var k uint32
+	for i := dataLen >> 2; i != 0; i-- {
+		k = uint32(data[0])<<24 | uint32(data[1])<<16 | uint32(data[2])<<8 | uint32(data[3])
+		data = data[4:]
+		h1 ^= mix(k)
+		h1 = (h1 << 13) | (h1 >> 19)
+		h1 = h1*5 + c5
 	}
 
-	h1 ^= uint32(clen)
+	k = 0
+	for i := dataLen & 3; i != 0; i-- {
+		k <<= 8
+		k |= uint32(data[i-1])
+	}
 
+	h1 ^= mix(k)
+
+	h1 ^= uint32(dataLen)
 	h1 ^= h1 >> 16
-	h1 *= 0x85ebca6b
+	h1 *= c3
 	h1 ^= h1 >> 13
-	h1 *= 0xc2b2ae35
+	h1 *= c4
 	h1 ^= h1 >> 16
 
 	return h1
+}
+
+func mix(k uint32) uint32 {
+	k *= c1
+	k = (k << 15) | (k >> 17)
+	k *= c2
+	return k
 }
