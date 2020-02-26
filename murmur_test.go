@@ -164,6 +164,57 @@ func TestQuickSeedSum128(t *testing.T) {
 	}
 }
 
+// go1.14 showed that doing *(*uint32)(unsafe.Pointer(&data[i*4])) was unsafe
+// due to alignment issues; this test ensures that we will always catch that.
+func TestUnaligned(t *testing.T) {
+	in1 := []byte("abcdefghijklmnopqrstuvwxyz")
+	in2 := []byte("_abcdefghijklmnopqrstuvwxyz")
+
+	{
+		sum1 := Sum32(in1)
+		sum2 := Sum32(in2[1:])
+		if sum1 != sum2 {
+			t.Errorf("%s: got sum1 %v sum2 %v unexpectedly not equal", "Sum32", sum1, sum2)
+		}
+	}
+
+	{
+		sum1 := Sum64(in1)
+		sum2 := Sum64(in2[1:])
+		if sum1 != sum2 {
+			t.Errorf("%s: got sum1 %v sum2 %v unexpectedly not equal", "Sum64", sum1, sum2)
+		}
+	}
+
+	{
+		sum1l, sum1r := Sum128(in1)
+		sum2l, sum2r := Sum128(in2[1:])
+		if sum1l != sum2l {
+			t.Errorf("%s: got sum1l %v sum2l %v unexpectedly not equal", "Sum128 left", sum1l, sum2l)
+		}
+		if sum1r != sum2r {
+			t.Errorf("%s: got sum1r %v sum2r %v unexpectedly not equal", "Sum128 right", sum1r, sum2r)
+		}
+	}
+
+	{
+		sum1 := func() uint32 { n := New32(); n.Write(in1); return n.Sum32() }()
+		sum2 := func() uint32 { n := New32(); n.Write(in2[1:]); return n.Sum32() }()
+		if sum1 != sum2 {
+			t.Errorf("%s: got sum1 %v sum2 %v unexpectedly not equal", "New32", sum1, sum2)
+		}
+	}
+
+	{
+		sum1 := func() uint64 { n := New64(); n.Write(in1); return n.Sum64() }()
+		sum2 := func() uint64 { n := New64(); n.Write(in2[1:]); return n.Sum64() }()
+		if sum1 != sum2 {
+			t.Errorf("%s: got sum1 %v sum2 %v unexpectedly not equal", "New64", sum1, sum2)
+		}
+	}
+
+}
+
 // TestBoundaries forces every block/tail path to be exercised for Sum32 and Sum128.
 func TestBoundaries(t *testing.T) {
 	const maxCheck = 17
