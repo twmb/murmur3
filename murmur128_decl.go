@@ -18,6 +18,9 @@ func Sum128(data []byte) (h1 uint64, h2 uint64)
 //
 // The canonical implementation allows only one uint32 seed; to imitate that
 // behavior, use the same, uint32-max seed for seed1 and seed2.
+//
+// This reads and processes the data in chunks of little endian uint64s;
+// thus, the returned hashes are portable across architectures.
 func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64)
 
 //go:noescape

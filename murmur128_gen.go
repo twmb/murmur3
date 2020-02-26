@@ -2,10 +2,7 @@
 
 package murmur3
 
-import (
-	"encoding/binary"
-	"math/bits"
-)
+import "math/bits"
 
 // StringSum128 is the string version of Sum128.
 func StringSum128(data string) (h1 uint64, h2 uint64) {
@@ -31,12 +28,18 @@ func Sum128(data []byte) (h1 uint64, h2 uint64) {
 //
 // The canonical implementation allows only one uint32 seed; to imitate that
 // behavior, use the same, uint32-max seed for seed1 and seed2.
+//
+// This reads and processes the data in chunks of little endian uint64s;
+// thus, the returned hashes are portable across architectures.
 func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64) {
 	h1, h2 = seed1, seed2
-	nblocks := len(data) / 16
-	for i := 0; i < nblocks; i++ {
-		k1 := binary.LittleEndian.Uint64(data[i*16:])
-		k2 := binary.LittleEndian.Uint64(data[i*16+8:])
+	clen := len(data)
+	for len(data) >= 16 {
+		// yes, this is faster than using binary.LittleEndian.Uint64
+		k1 := uint64(data[0]) | uint64(data[1])<<8 | uint64(data[2])<<16 | uint64(data[3])<<24 | uint64(data[4])<<32 | uint64(data[5])<<40 | uint64(data[6])<<48 | uint64(data[7])<<56
+		k2 := uint64(data[8]) | uint64(data[9])<<8 | uint64(data[10])<<16 | uint64(data[11])<<24 | uint64(data[12])<<32 | uint64(data[13])<<40 | uint64(data[14])<<48 | uint64(data[15])<<56
+
+		data = data[16:]
 
 		k1 *= c1_128
 		k1 = bits.RotateLeft64(k1, 31)
@@ -56,30 +59,29 @@ func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64) {
 		h2 += h1
 		h2 = h2*5 + 0x38495ab5
 	}
-	tail := data[nblocks*16:]
 
 	var k1, k2 uint64
-	switch len(tail) & 15 {
+	switch len(data) {
 	case 15:
-		k2 ^= uint64(tail[14]) << 48
+		k2 ^= uint64(data[14]) << 48
 		fallthrough
 	case 14:
-		k2 ^= uint64(tail[13]) << 40
+		k2 ^= uint64(data[13]) << 40
 		fallthrough
 	case 13:
-		k2 ^= uint64(tail[12]) << 32
+		k2 ^= uint64(data[12]) << 32
 		fallthrough
 	case 12:
-		k2 ^= uint64(tail[11]) << 24
+		k2 ^= uint64(data[11]) << 24
 		fallthrough
 	case 11:
-		k2 ^= uint64(tail[10]) << 16
+		k2 ^= uint64(data[10]) << 16
 		fallthrough
 	case 10:
-		k2 ^= uint64(tail[9]) << 8
+		k2 ^= uint64(data[9]) << 8
 		fallthrough
 	case 9:
-		k2 ^= uint64(tail[8]) << 0
+		k2 ^= uint64(data[8]) << 0
 
 		k2 *= c2_128
 		k2 = bits.RotateLeft64(k2, 33)
@@ -89,35 +91,34 @@ func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64) {
 		fallthrough
 
 	case 8:
-		k1 ^= uint64(tail[7]) << 56
+		k1 ^= uint64(data[7]) << 56
 		fallthrough
 	case 7:
-		k1 ^= uint64(tail[6]) << 48
+		k1 ^= uint64(data[6]) << 48
 		fallthrough
 	case 6:
-		k1 ^= uint64(tail[5]) << 40
+		k1 ^= uint64(data[5]) << 40
 		fallthrough
 	case 5:
-		k1 ^= uint64(tail[4]) << 32
+		k1 ^= uint64(data[4]) << 32
 		fallthrough
 	case 4:
-		k1 ^= uint64(tail[3]) << 24
+		k1 ^= uint64(data[3]) << 24
 		fallthrough
 	case 3:
-		k1 ^= uint64(tail[2]) << 16
+		k1 ^= uint64(data[2]) << 16
 		fallthrough
 	case 2:
-		k1 ^= uint64(tail[1]) << 8
+		k1 ^= uint64(data[1]) << 8
 		fallthrough
 	case 1:
-		k1 ^= uint64(tail[0]) << 0
+		k1 ^= uint64(data[0]) << 0
 		k1 *= c1_128
 		k1 = bits.RotateLeft64(k1, 31)
 		k1 *= c2_128
 		h1 ^= k1
 	}
 
-	clen := len(data)
 	h1 ^= uint64(clen)
 	h2 ^= uint64(clen)
 

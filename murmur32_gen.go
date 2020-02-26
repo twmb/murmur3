@@ -1,7 +1,6 @@
 package murmur3
 
 import (
-	"encoding/binary"
 	"math/bits"
 )
 
@@ -26,11 +25,15 @@ func Sum32(data []byte) uint32 {
 
 // SeedSum32 returns the murmur3 sum of data with the digest initialized to
 // seed.
+//
+// This reads and processes the data in chunks of little endian uint32s;
+// thus, the returned hash is portable across architectures.
 func SeedSum32(seed uint32, data []byte) (h1 uint32) {
 	h1 = seed
-	nblocks := len(data) / 4
-	for i := 0; i < nblocks; i++ {
-		k1 := binary.LittleEndian.Uint32(data[i*4:])
+	clen := uint32(len(data))
+	for len(data) >= 4 {
+		k1 := uint32(data[0]) | uint32(data[1])<<8 | uint32(data[2])<<16 | uint32(data[3])<<24
+		data = data[4:]
 
 		k1 *= c1_32
 		k1 = bits.RotateLeft32(k1, 15)
@@ -40,18 +43,16 @@ func SeedSum32(seed uint32, data []byte) (h1 uint32) {
 		h1 = bits.RotateLeft32(h1, 13)
 		h1 = h1*5 + 0xe6546b64
 	}
-	clen := uint32(len(data))
-	tail := data[nblocks<<2:]
 	var k1 uint32
-	switch len(tail) & 3 {
+	switch len(data) {
 	case 3:
-		k1 ^= uint32(tail[2]) << 16
+		k1 ^= uint32(data[2]) << 16
 		fallthrough
 	case 2:
-		k1 ^= uint32(tail[1]) << 8
+		k1 ^= uint32(data[1]) << 8
 		fallthrough
 	case 1:
-		k1 ^= uint32(tail[0])
+		k1 ^= uint32(data[0])
 		k1 *= c1_32
 		k1 = bits.RotateLeft32(k1, 15)
 		k1 *= c2_32

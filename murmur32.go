@@ -1,7 +1,6 @@
 package murmur3
 
 import (
-	"encoding/binary"
 	"hash"
 	"math/bits"
 )
@@ -26,6 +25,9 @@ type digest32 struct {
 
 // SeedNew32 returns a hash.Hash32 for streaming 32 bit sums with its internal
 // digest initialized to seed.
+//
+// This reads and processes the data in chunks of little endian uint32s;
+// thus, the returned hash is portable across architectures.
 func SeedNew32(seed uint32) hash.Hash32 {
 	d := &digest32{seed: seed}
 	d.bmixer = d
@@ -51,9 +53,9 @@ func (d *digest32) Sum(b []byte) []byte {
 func (d *digest32) bmix(p []byte) (tail []byte) {
 	h1 := d.h1
 
-	nblocks := len(p) / 4
-	for i := 0; i < nblocks; i++ {
-		k1 := binary.LittleEndian.Uint32(p[i*4:])
+	for len(p) >= 4 {
+		k1 := uint32(p[0]) | uint32(p[1])<<8 | uint32(p[2])<<16 | uint32(p[3])<<24
+		p = p[4:]
 
 		k1 *= c1_32
 		k1 = bits.RotateLeft32(k1, 15)
@@ -64,7 +66,7 @@ func (d *digest32) bmix(p []byte) (tail []byte) {
 		h1 = h1*5 + 0xe6546b64
 	}
 	d.h1 = h1
-	return p[nblocks*d.Size():]
+	return p
 }
 
 func (d *digest32) Sum32() (h1 uint32) {
