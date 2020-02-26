@@ -1,7 +1,6 @@
 package murmur3
 
 import (
-	"encoding/binary"
 	"hash"
 	"math/bits"
 )
@@ -68,10 +67,10 @@ func (d *digest128) Sum(b []byte) []byte {
 func (d *digest128) bmix(p []byte) (tail []byte) {
 	h1, h2 := d.h1, d.h2
 
-	nblocks := len(p) / 16
-	for i := 0; i < nblocks; i++ {
-		k1 := binary.LittleEndian.Uint64(p[i*16:])
-		k2 := binary.LittleEndian.Uint64(p[i*16+8:])
+	for len(p) >= 16 {
+		k1 := uint64(p[0]) | uint64(p[1])<<8 | uint64(p[2])<<16 | uint64(p[3])<<24 | uint64(p[4])<<32 | uint64(p[5])<<40 | uint64(p[6])<<48 | uint64(p[7])<<56
+		k2 := uint64(p[8]) | uint64(p[9])<<8 | uint64(p[10])<<16 | uint64(p[11])<<24 | uint64(p[12])<<32 | uint64(p[13])<<40 | uint64(p[14])<<48 | uint64(p[15])<<56
+		p = p[16:]
 
 		k1 *= c1_128
 		k1 = bits.RotateLeft64(k1, 31)
@@ -92,7 +91,7 @@ func (d *digest128) bmix(p []byte) (tail []byte) {
 		h2 = h2*5 + 0x38495ab5
 	}
 	d.h1, d.h2 = h1, h2
-	return p[nblocks*d.Size():]
+	return p
 }
 
 func (d *digest128) Sum128() (h1, h2 uint64) {
