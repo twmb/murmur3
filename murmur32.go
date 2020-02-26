@@ -1,8 +1,9 @@
 package murmur3
 
 import (
+	"encoding/binary"
 	"hash"
-	"unsafe"
+	"math/bits"
 )
 
 // Make sure interfaces are correctly implemented.
@@ -52,14 +53,14 @@ func (d *digest32) bmix(p []byte) (tail []byte) {
 
 	nblocks := len(p) / 4
 	for i := 0; i < nblocks; i++ {
-		k1 := *(*uint32)(unsafe.Pointer(&p[i*4]))
+		k1 := binary.LittleEndian.Uint32(p[i*4:])
 
 		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
+		k1 = bits.RotateLeft32(k1, 15)
 		k1 *= c2_32
 
 		h1 ^= k1
-		h1 = (h1 << 13) | (h1 >> 19) // rotl32(h1, 13)
+		h1 = bits.RotateLeft32(h1, 13)
 		h1 = h1*5 + 0xe6546b64
 	}
 	d.h1 = h1
@@ -80,7 +81,7 @@ func (d *digest32) Sum32() (h1 uint32) {
 	case 1:
 		k1 ^= uint32(d.tail[0])
 		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
+		k1 = bits.RotateLeft32(k1, 15)
 		k1 *= c2_32
 		h1 ^= k1
 	}

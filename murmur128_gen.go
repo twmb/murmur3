@@ -2,7 +2,10 @@
 
 package murmur3
 
-import "unsafe"
+import (
+	"encoding/binary"
+	"math/bits"
+)
 
 // StringSum128 is the string version of Sum128.
 func StringSum128(data string) (h1 uint64, h2 uint64) {
@@ -32,24 +35,24 @@ func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64) {
 	h1, h2 = seed1, seed2
 	nblocks := len(data) / 16
 	for i := 0; i < nblocks; i++ {
-		t := (*[2]uint64)(unsafe.Pointer(&data[i*16]))
-		k1, k2 := t[0], t[1]
+		k1 := binary.LittleEndian.Uint64(data[i*16:])
+		k2 := binary.LittleEndian.Uint64(data[i*16+8:])
 
 		k1 *= c1_128
-		k1 = (k1 << 31) | (k1 >> 33) // rotl64(k1, 31)
+		k1 = bits.RotateLeft64(k1, 31)
 		k1 *= c2_128
 		h1 ^= k1
 
-		h1 = (h1 << 27) | (h1 >> 37) // rotl64(h1, 27)
+		h1 = bits.RotateLeft64(h1, 27)
 		h1 += h2
 		h1 = h1*5 + 0x52dce729
 
 		k2 *= c2_128
-		k2 = (k2 << 33) | (k2 >> 31) // rotl64(k2, 33)
+		k2 = bits.RotateLeft64(k2, 33)
 		k2 *= c1_128
 		h2 ^= k2
 
-		h2 = (h2 << 31) | (h2 >> 33) // rotl64(h2, 31)
+		h2 = bits.RotateLeft64(h2, 31)
 		h2 += h1
 		h2 = h2*5 + 0x38495ab5
 	}
@@ -79,7 +82,7 @@ func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64) {
 		k2 ^= uint64(tail[8]) << 0
 
 		k2 *= c2_128
-		k2 = (k2 << 33) | (k2 >> 31) // rotl64(k2, 33)
+		k2 = bits.RotateLeft64(k2, 33)
 		k2 *= c1_128
 		h2 ^= k2
 
@@ -109,7 +112,7 @@ func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64) {
 	case 1:
 		k1 ^= uint64(tail[0]) << 0
 		k1 *= c1_128
-		k1 = (k1 << 31) | (k1 >> 33) // rotl64(k1, 31)
+		k1 = bits.RotateLeft64(k1, 31)
 		k1 *= c2_128
 		h1 ^= k1
 	}

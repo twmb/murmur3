@@ -1,6 +1,9 @@
 package murmur3
 
-import "unsafe"
+import (
+	"encoding/binary"
+	"math/bits"
+)
 
 // StringSum32 is the string version of Sum32.
 func StringSum32(data string) uint32 {
@@ -27,14 +30,14 @@ func SeedSum32(seed uint32, data []byte) (h1 uint32) {
 	h1 = seed
 	nblocks := len(data) / 4
 	for i := 0; i < nblocks; i++ {
-		k1 := *(*uint32)(unsafe.Pointer(&data[i*4]))
+		k1 := binary.LittleEndian.Uint32(data[i*4:])
 
 		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
+		k1 = bits.RotateLeft32(k1, 15)
 		k1 *= c2_32
 
 		h1 ^= k1
-		h1 = (h1 << 13) | (h1 >> 19) // rotl32(*h1, 13)
+		h1 = bits.RotateLeft32(h1, 13)
 		h1 = h1*5 + 0xe6546b64
 	}
 	clen := uint32(len(data))
@@ -50,7 +53,7 @@ func SeedSum32(seed uint32, data []byte) (h1 uint32) {
 	case 1:
 		k1 ^= uint32(tail[0])
 		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
+		k1 = bits.RotateLeft32(k1, 15)
 		k1 *= c2_32
 		h1 ^= k1
 	}
