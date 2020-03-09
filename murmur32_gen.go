@@ -2,16 +2,16 @@ package murmur3
 
 import (
 	"math/bits"
+	"unsafe"
 )
 
-// StringSum32 is the string version of Sum32.
-func StringSum32(data string) uint32 {
-	return SeedSum32(0, quickslice(data))
-}
-
-// SeedStringSum32 is the string version of SeedSum32.
-func SeedStringSum32(seed uint32, data string) (h1 uint32) {
-	return SeedSum32(seed, quickslice(data))
+// SeedSum32 returns the murmur3 sum of data with the digest initialized to
+// seed.
+//
+// This reads and processes the data in chunks of little endian uint32s;
+// thus, the returned hash is portable across architectures.
+func SeedSum32(seed uint32, data []byte) (h1 uint32) {
+	return SeedStringSum32(seed, *(*string)(unsafe.Pointer(&data)))
 }
 
 // Sum32 returns the murmur3 sum of data. It is equivalent to the following
@@ -20,15 +20,16 @@ func SeedStringSum32(seed uint32, data string) (h1 uint32) {
 //     hasher.Write(data)
 //     return hasher.Sum32()
 func Sum32(data []byte) uint32 {
-	return SeedSum32(0, data)
+	return SeedStringSum32(0, *(*string)(unsafe.Pointer(&data)))
 }
 
-// SeedSum32 returns the murmur3 sum of data with the digest initialized to
-// seed.
-//
-// This reads and processes the data in chunks of little endian uint32s;
-// thus, the returned hash is portable across architectures.
-func SeedSum32(seed uint32, data []byte) (h1 uint32) {
+// StringSum32 is the string version of Sum32.
+func StringSum32(data string) uint32 {
+	return SeedStringSum32(0, data)
+}
+
+// SeedStringSum32 is the string version of SeedSum32.
+func SeedStringSum32(seed uint32, data string) (h1 uint32) {
 	h1 = seed
 	clen := uint32(len(data))
 	for len(data) >= 4 {

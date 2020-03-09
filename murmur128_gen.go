@@ -4,25 +4,6 @@ package murmur3
 
 import "math/bits"
 
-// StringSum128 is the string version of Sum128.
-func StringSum128(data string) (h1 uint64, h2 uint64) {
-	return SeedSum128(0, 0, quickslice(data))
-}
-
-// SeedStringSum128 is the string version of SeedSum128.
-func SeedStringSum128(seed1, seed2 uint64, data string) (h1 uint64, h2 uint64) {
-	return SeedSum128(seed1, seed2, quickslice(data))
-}
-
-// Sum128 returns the murmur3 sum of data. It is equivalent to the following
-// sequence (without the extra burden and the extra allocation):
-//     hasher := New128()
-//     hasher.Write(data)
-//     return hasher.Sum128()
-func Sum128(data []byte) (h1 uint64, h2 uint64) {
-	return SeedSum128(0, 0, data)
-}
-
 // SeedSum128 returns the murmur3 sum of data with digests initialized to seed1
 // and seed2.
 //
@@ -32,6 +13,25 @@ func Sum128(data []byte) (h1 uint64, h2 uint64) {
 // This reads and processes the data in chunks of little endian uint64s;
 // thus, the returned hashes are portable across architectures.
 func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64) {
+	return SeedStringSum128(seed1, seed2, *(*string)(unsafe.Pointer(&data)))
+}
+
+// Sum128 returns the murmur3 sum of data. It is equivalent to the following
+// sequence (without the extra burden and the extra allocation):
+//     hasher := New128()
+//     hasher.Write(data)
+//     return hasher.Sum128()
+func Sum128(data []byte) (h1 uint64, h2 uint64) {
+	return SeedStringSum128(0, 0, *(*string)(unsafe.Pointer(&data)))
+}
+
+// StringSum128 is the string version of Sum128.
+func StringSum128(data string) (h1 uint64, h2 uint64) {
+	return SeedStringSum128(0, 0, data)
+}
+
+// SeedStringSum128 is the string version of SeedSum128.
+func SeedStringSum128(seed1, seed2 uint64, data string) (h1 uint64, h2 uint64) {
 	h1, h2 = seed1, seed2
 	clen := len(data)
 	for len(data) >= 16 {
