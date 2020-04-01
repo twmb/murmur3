@@ -9,9 +9,15 @@ import (
 	"strconv"
 	"testing"
 	"testing/quick"
+	"unsafe"
 
 	"github.com/twmb/murmur3/testdata"
 )
+
+var isLittleEndian = func() bool {
+	i := uint16(1)
+	return (*(*[2]byte)(unsafe.Pointer(&i)))[0] == 1
+}()
 
 var data = []struct {
 	h32   uint32
@@ -86,7 +92,10 @@ func TestQuickSum32(t *testing.T) {
 	f := func(data []byte) bool {
 		goh1 := Sum32(data)
 		goh2 := StringSum32(string(data))
-		cpph1 := testdata.SeedSum32(0, data)
+		cpph1 := goh1
+		if isLittleEndian {
+			cpph1 = testdata.SeedSum32(0, data)
+		}
 		return goh1 == goh2 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
@@ -99,7 +108,10 @@ func TestQuickSeedSum32(t *testing.T) {
 		goh1 := SeedSum32(seed, data)
 		goh2 := SeedStringSum32(seed, string(data))
 		goh3 := func() uint32 { h := SeedNew32(seed); h.Write(data); return binary.BigEndian.Uint32(h.Sum(nil)) }()
-		cpph1 := testdata.SeedSum32(seed, data)
+		cpph1 := goh1
+		if isLittleEndian {
+			cpph1 = testdata.SeedSum32(seed, data)
+		}
 		return goh1 == goh2 && goh1 == goh3 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
@@ -111,7 +123,10 @@ func TestQuickSum64(t *testing.T) {
 	f := func(data []byte) bool {
 		goh1 := Sum64(data)
 		goh2 := StringSum64(string(data))
-		cpph1 := testdata.SeedSum64(0, data)
+		cpph1 := goh1
+		if isLittleEndian {
+			cpph1 = testdata.SeedSum64(0, data)
+		}
 		return goh1 == goh2 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
@@ -124,7 +139,10 @@ func TestQuickSeedSum64(t *testing.T) {
 		goh1 := SeedSum64(uint64(seed), data)
 		goh2 := SeedStringSum64(uint64(seed), string(data))
 		goh3 := func() uint64 { h := SeedNew64(uint64(seed)); h.Write(data); return binary.BigEndian.Uint64(h.Sum(nil)) }()
-		cpph1 := testdata.SeedSum64(seed, data)
+		cpph1 := goh1
+		if isLittleEndian {
+			cpph1 = testdata.SeedSum64(seed, data)
+		}
 		return goh1 == goh2 && goh1 == goh3 && goh1 == cpph1
 	}
 	if err := quick.Check(f, nil); err != nil {
@@ -136,7 +154,10 @@ func TestQuickSum128(t *testing.T) {
 	f := func(data []byte) bool {
 		goh1, goh2 := Sum128(data)
 		goh3, goh4 := StringSum128(string(data))
-		cpph1, cpph2 := testdata.SeedSum128(0, data)
+		cpph1, cpph2 := goh1, goh2
+		if isLittleEndian {
+			cpph1, cpph2 = testdata.SeedSum128(0, data)
+		}
 		return goh1 == goh3 && goh2 == goh4 && goh1 == cpph1 && goh2 == cpph2
 	}
 	if err := quick.Check(f, nil); err != nil {
@@ -154,7 +175,10 @@ func TestQuickSeedSum128(t *testing.T) {
 			sum := h.Sum(nil)
 			return binary.BigEndian.Uint64(sum), binary.BigEndian.Uint64(sum[8:])
 		}()
-		cpph1, cpph2 := testdata.SeedSum128(seed, data)
+		cpph1, cpph2 := goh1, goh2
+		if isLittleEndian {
+			testdata.SeedSum128(seed, data)
+		}
 		return goh1 == goh3 && goh2 == goh4 &&
 			goh1 == goh5 && goh2 == goh6 &&
 			goh1 == cpph1 && goh2 == cpph2
@@ -225,7 +249,10 @@ func TestBoundaries(t *testing.T) {
 			test := data[:size]
 			g32h1 := Sum32(test)
 			g32h1s := SeedSum32(0, test)
-			c32h1 := testdata.SeedSum32(0, test)
+			c32h1 := g32h1
+			if isLittleEndian {
+				c32h1 = testdata.SeedSum32(0, test)
+			}
 			if g32h1 != c32h1 {
 				t.Errorf("size #%d: in: %x, g32h1 (%d) != c32h1 (%d); attempt #%d", size, test, g32h1, c32h1, i)
 			}
@@ -234,7 +261,10 @@ func TestBoundaries(t *testing.T) {
 			}
 			g64h1 := Sum64(test)
 			g64h1s := SeedSum64(0, test)
-			c64h1 := testdata.SeedSum64(0, test)
+			c64h1 := g64h1
+			if isLittleEndian {
+				c64h1 = testdata.SeedSum64(0, test)
+			}
 			if g64h1 != c64h1 {
 				t.Errorf("size #%d: in: %x, g64h1 (%d) != c64h1 (%d); attempt #%d", size, test, g64h1, c64h1, i)
 			}
@@ -243,7 +273,10 @@ func TestBoundaries(t *testing.T) {
 			}
 			g128h1, g128h2 := Sum128(test)
 			g128h1s, g128h2s := SeedSum128(0, 0, test)
-			c128h1, c128h2 := testdata.SeedSum128(0, test)
+			c128h1, c128h2 := g128h1, g128h2
+			if isLittleEndian {
+				c128h1, c128h2 = testdata.SeedSum128(0, test)
+			}
 			if g128h1 != c128h1 {
 				t.Errorf("size #%d: in: %x, g128h1 (%d) != c128h1 (%d); attempt #%d", size, test, g128h1, c128h1, i)
 			}
