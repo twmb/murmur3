@@ -9,6 +9,11 @@
 // architectures.
 package murmur3
 
+import (
+	"reflect"
+	"unsafe"
+)
+
 type bmixer interface {
 	bmix(p []byte) (tail []byte)
 	Size() (n int)
@@ -55,4 +60,13 @@ func (d *digest) Reset() {
 	d.clen = 0
 	d.tail = nil
 	d.bmixer.reset()
+}
+
+func strslice(slice []byte) string {
+	var str string
+	*(*reflect.StringHeader)(unsafe.Pointer(&str)) = reflect.StringHeader{
+		Data: ((*reflect.SliceHeader)(unsafe.Pointer(&slice))).Data,
+		Len:  len(slice),
+	}
+	return str
 }
