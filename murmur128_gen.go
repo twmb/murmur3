@@ -2,7 +2,10 @@
 
 package murmur3
 
-import "math/bits"
+import (
+	"math/bits"
+	"unsafe"
+)
 
 // SeedSum128 returns the murmur3 sum of data with digests initialized to seed1
 // and seed2.
