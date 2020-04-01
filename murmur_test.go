@@ -421,3 +421,10 @@ func BenchmarkNoescape128(b *testing.B) {
 		Sum128(buf[:])
 	}
 }
+
+func BenchmarkStrslice(b *testing.B) {
+	var s []byte
+	for i := 0; i < b.N; i++ {
+		strslice(s)
+	}
+}

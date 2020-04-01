@@ -1,9 +1,6 @@
 package murmur3
 
-import (
-	"math/bits"
-	"unsafe"
-)
+import "math/bits"
 
 // SeedSum32 returns the murmur3 sum of data with the digest initialized to
 // seed.
@@ -11,7 +8,7 @@ import (
 // This reads and processes the data in chunks of little endian uint32s;
 // thus, the returned hash is portable across architectures.
 func SeedSum32(seed uint32, data []byte) (h1 uint32) {
-	return SeedStringSum32(seed, *(*string)(unsafe.Pointer(&data)))
+	return SeedStringSum32(seed, strslice(data))
 }
 
 // Sum32 returns the murmur3 sum of data. It is equivalent to the following
@@ -20,7 +17,7 @@ func SeedSum32(seed uint32, data []byte) (h1 uint32) {
 //     hasher.Write(data)
 //     return hasher.Sum32()
 func Sum32(data []byte) uint32 {
-	return SeedStringSum32(0, *(*string)(unsafe.Pointer(&data)))
+	return SeedStringSum32(0, strslice(data))
 }
 
 // StringSum32 is the string version of Sum32.
