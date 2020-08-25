@@ -49,15 +49,15 @@ TEXT sum128internal<>(SB), $0
 	MOVQ R9, CX
 	ANDQ $-16, CX // cx == data_len - (data_len % 16)
 
-	// for bp = 0; bp < cx; bp += 16 {...
-	XORQ BP, BP
+	// for r10 = 0; r10 < cx; r10 += 16 {...
+	XORQ R10, R10
 
 loop:
-	CMPQ BP, CX
+	CMPQ R10, CX
 	JE   tail
-	MOVQ (SI)(BP*1), AX
-	MOVQ 8(SI)(BP*1), DX
-	ADDQ $16, BP
+	MOVQ (SI)(R10*1), AX
+	MOVQ 8(SI)(R10*1), DX
+	ADDQ $16, R10
 
 	IMULQ R14, AX
 	IMULQ R15, DX
@@ -120,33 +120,33 @@ over12:
 	JZ   tail14
 
 tail15:
-	MOVBQZX 14(SI)(BP*1), AX
+	MOVBQZX 14(SI)(R10*1), AX
 	SALQ    $16, AX
 
 tail14:
-	MOVW 12(SI)(BP*1), AX
+	MOVW 12(SI)(R10*1), AX
 	SALQ $32, AX
 	JMP  tail12
 
 tail13:
-	MOVBQZX 12(SI)(BP*1), AX
+	MOVBQZX 12(SI)(R10*1), AX
 	SALQ    $32, AX
 
 tail12:
-	MOVL 8(SI)(BP*1), DX
+	MOVL 8(SI)(R10*1), DX
 	ORQ  DX, AX
 	JMP  fintailhigh
 
 tail11:
-	MOVBQZX 10(SI)(BP*1), AX
+	MOVBQZX 10(SI)(R10*1), AX
 	SALQ    $16, AX
 
 tail10:
-	MOVW 8(SI)(BP*1), AX
+	MOVW 8(SI)(R10*1), AX
 	JMP  fintailhigh
 
 tail9:
-	MOVB 8(SI)(BP*1), AL
+	MOVB 8(SI)(R10*1), AL
 
 fintailhigh:
 	IMULQ R15, AX
@@ -155,37 +155,37 @@ fintailhigh:
 	XORQ  AX, R13
 
 tail8:
-	MOVQ (SI)(BP*1), AX
+	MOVQ (SI)(R10*1), AX
 	JMP  fintaillow
 
 tail7:
-	MOVBQZX 6(SI)(BP*1), AX
+	MOVBQZX 6(SI)(R10*1), AX
 	SALQ    $16, AX
 
 tail6:
-	MOVW 4(SI)(BP*1), AX
+	MOVW 4(SI)(R10*1), AX
 	SALQ $32, AX
 	JMP  tail4
 
 tail5:
-	MOVBQZX 4(SI)(BP*1), AX
+	MOVBQZX 4(SI)(R10*1), AX
 	SALQ    $32, AX
 
 tail4:
-	MOVL (SI)(BP*1), DX
+	MOVL (SI)(R10*1), DX
 	ORQ  DX, AX
 	JMP  fintaillow
 
 tail3:
-	MOVBQZX 2(SI)(BP*1), AX
+	MOVBQZX 2(SI)(R10*1), AX
 	SALQ    $16, AX
 
 tail2:
-	MOVW (SI)(BP*1), AX
+	MOVW (SI)(R10*1), AX
 	JMP  fintaillow
 
 tail1:
-	MOVB (SI)(BP*1), AL
+	MOVB (SI)(R10*1), AL
 
 fintaillow:
 	IMULQ R14, AX
