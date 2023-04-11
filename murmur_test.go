@@ -236,7 +236,6 @@ func TestUnaligned(t *testing.T) {
 			t.Errorf("%s: got sum1 %v sum2 %v unexpectedly not equal", "New64", sum1, sum2)
 		}
 	}
-
 }
 
 // TestBoundaries forces every block/tail path to be exercised for Sum32 and Sum128.
@@ -419,12 +418,5 @@ func BenchmarkNoescape128(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		var buf [8192]byte
 		Sum128(buf[:])
-	}
-}
-
-func BenchmarkStrslice(b *testing.B) {
-	var s []byte
-	for i := 0; i < b.N; i++ {
-		strslice(s)
 	}
 }
