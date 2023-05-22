@@ -1,5 +1,5 @@
-//go:build !go1.5 || !amd64
-// +build !go1.5 !amd64
+//go:build !go1.5 || !amd64 || gccgo
+// +build !go1.5 !amd64 gccgo
 
 package murmur3
 
