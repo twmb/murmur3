@@ -177,7 +177,7 @@ func TestQuickSeedSum128(t *testing.T) {
 		}()
 		cpph1, cpph2 := goh1, goh2
 		if isLittleEndian {
-			testdata.SeedSum128(seed, data)
+			cpph1, cpph2 = testdata.SeedSum128(seed, data)
 		}
 		return goh1 == goh3 && goh2 == goh4 &&
 			goh1 == goh5 && goh2 == goh6 &&
@@ -238,9 +238,11 @@ func TestUnaligned(t *testing.T) {
 	}
 }
 
-// TestBoundaries forces every block/tail path to be exercised for Sum32 and Sum128.
+// TestBoundaries forces every block/tail path to be exercised for Sum32 and
+// Sum128: the block loop, the single trailing block, and every tail length,
+// across several loop iterations.
 func TestBoundaries(t *testing.T) {
-	const maxCheck = 17
+	const maxCheck = 100
 	var data [maxCheck]byte
 	for i := 0; !t.Failed() && i < 20; i++ {
 		// Check all zeros the first iteration.
@@ -294,6 +296,59 @@ func TestBoundaries(t *testing.T) {
 	}
 }
 
+// TestClone forks each streaming hash while it holds a partial block, then
+// checks that both forks match fresh hashes and that neither sees the
+// other's writes.
+func TestClone(t *testing.T) {
+	prefix := []byte("0123456789abcdefghijk") // 21 bytes: 5 byte tail for 128, 1 for 32.
+	sufA, sufB := []byte("AAAAAAA"), []byte("BBBBBBBBBBBBBBBBBBBBBBB")
+	full := func(h hash.Hash, parts ...[]byte) []byte {
+		for _, p := range parts {
+			h.Write(p)
+		}
+		return h.Sum(nil)
+	}
+	for name, mk := range map[string]func() hash.Hash{
+		"32":  func() hash.Hash { return SeedNew32(7) },
+		"64":  func() hash.Hash { return SeedNew64(7) },
+		"128": func() hash.Hash { return SeedNew128(7, 9) },
+	} {
+		h := mk()
+		h.Write(prefix)
+		c, err := h.(hash.Cloner).Clone()
+		if err != nil {
+			t.Fatalf("%s: clone: %v", name, err)
+		}
+		h.Write(sufA)
+		c.Write(sufB)
+		if got, want := h.Sum(nil), full(mk(), prefix, sufA); string(got) != string(want) {
+			t.Errorf("%s: original after clone: got %x want %x", name, got, want)
+		}
+		if got, want := c.Sum(nil), full(mk(), prefix, sufB); string(got) != string(want) {
+			t.Errorf("%s: clone: got %x want %x", name, got, want)
+		}
+		// A clone of a clone, and a clone after Reset, must also stand alone.
+		cc, _ := c.Clone()
+		cc.Reset()
+		cc.Write(sufA)
+		if got, want := cc.Sum(nil), full(mk(), sufA); string(got) != string(want) {
+			t.Errorf("%s: reset clone: got %x want %x", name, got, want)
+		}
+		if got, want := c.Sum(nil), full(mk(), prefix, sufB); string(got) != string(want) {
+			t.Errorf("%s: clone after cloning it: got %x want %x", name, got, want)
+		}
+	}
+	// The 64 and 128 bit clones keep their wider interfaces.
+	c128, _ := New128().(hash.Cloner).Clone()
+	if _, ok := c128.(Hash128); !ok {
+		t.Error("128 bit clone is not a Hash128")
+	}
+	c64, _ := New64().(hash.Cloner).Clone()
+	if _, ok := c64.(hash.Hash64); !ok {
+		t.Error("64 bit clone is not a hash.Hash64")
+	}
+}
+
 func TestIncremental(t *testing.T) {
 	for _, elem := range data {
 		h32 := New32()
@@ -304,11 +359,9 @@ func TestIncremental(t *testing.T) {
 				j = k
 			}
 			s := elem.s[i:j]
-			print(s + "|")
 			h32.Write([]byte(s))
 			h128.Write([]byte(s))
 		}
-		println()
 		if v := h32.Sum32(); v != elem.h32 {
 			t.Errorf("'%s': 0x%x (want 0x%x)", elem.s, v, elem.h32)
 		}
@@ -326,8 +379,7 @@ func Benchmark32Branches(b *testing.B) {
 		b.Run(strconv.Itoa(length), func(b *testing.B) {
 			buf := make([]byte, length)
 			b.SetBytes(int64(length))
-			b.ResetTimer()
-			for length := 0; length < b.N; length++ {
+			for b.Loop() {
 				Sum32(buf)
 			}
 		})
@@ -339,8 +391,7 @@ func BenchmarkPartial32Branches(b *testing.B) {
 		b.Run(strconv.Itoa(length), func(b *testing.B) {
 			buf := make([]byte, length)
 			b.SetBytes(int64(length))
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				hasher := New32()
 				hasher.Write(buf)
 				hasher.Sum32()
@@ -354,8 +405,7 @@ func Benchmark128Branches(b *testing.B) {
 		b.Run(strconv.Itoa(length), func(b *testing.B) {
 			buf := make([]byte, length)
 			b.SetBytes(int64(length))
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				Sum128(buf)
 			}
 		})
@@ -371,8 +421,7 @@ func Benchmark32Sizes(b *testing.B) {
 		b.Run(strconv.Itoa(length), func(b *testing.B) {
 			buf = buf[:length]
 			b.SetBytes(int64(length))
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				Sum32(buf)
 			}
 		})
@@ -385,8 +434,7 @@ func Benchmark64Sizes(b *testing.B) {
 		b.Run(strconv.Itoa(length), func(b *testing.B) {
 			buf = buf[:length]
 			b.SetBytes(int64(length))
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				Sum64(buf)
 			}
 		})
@@ -399,23 +447,48 @@ func Benchmark128Sizes(b *testing.B) {
 		b.Run(strconv.Itoa(length), func(b *testing.B) {
 			buf = buf[:length]
 			b.SetBytes(int64(length))
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				Sum128(buf)
 			}
 		})
 	}
 }
 
+// Fixed length benchmarks let the branch predictor learn every branch in
+// the tail. Real key streams do not, so these draw a fresh length in [0, 64)
+// from xorshift on every call; the generator itself is a few cycles.
+
+func BenchmarkRandomLengths32(b *testing.B) {
+	buf := make([]byte, 64)
+	x := uint64(88172645463325252)
+	for b.Loop() {
+		x ^= x << 13
+		x ^= x >> 7
+		x ^= x << 17
+		Sum32(buf[:x&63])
+	}
+}
+
+func BenchmarkRandomLengths128(b *testing.B) {
+	buf := make([]byte, 64)
+	x := uint64(88172645463325252)
+	for b.Loop() {
+		x ^= x << 13
+		x ^= x >> 7
+		x ^= x << 17
+		Sum128(buf[:x&63])
+	}
+}
+
 func BenchmarkNoescape32(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var buf [8192]byte
 		Sum32(buf[:])
 	}
 }
 
 func BenchmarkNoescape128(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var buf [8192]byte
 		Sum128(buf[:])
 	}
