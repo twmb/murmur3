@@ -125,19 +125,18 @@ func SeedStringSum128(seed1, seed2 uint64, data string) (h1 uint64, h2 uint64) {
 // of their input; the streaming digest passes its leftover tail.
 func sum128[T bytestring](h1, h2 uint64, data T, clen int) (uint64, uint64) {
 	if len(data) >= 16 {
-		// With at least one full block, the last 16 bytes of the input are
-		// always in bounds, and the tail is whatever of them the block loop
-		// will not consume. Read it out of them here with two overlapping
-		// loads instead of branching on its length afterwards: a switch on
-		// the length is a jump table, and on varying key lengths it
-		// mispredicts nearly every time. Doing it before the loop also
-		// leaves only two words live across the loop and hides the loads
-		// behind it. k1 is the first eight tail bytes, loaded exactly when
-		// n >= 8 and otherwise shifted down out of the last eight bytes;
-		// k2 is whatever sits above those. A shift of 64 or more is zero
-		// in Go, so k2 is zero for a tail of eight bytes or fewer, and
-		// mixing zero changes nothing, so the mixes need no guard of
-		// their own.
+		// With a full block present, the last 16 bytes are always in
+		// bounds and the tail is whatever of them the loop will not
+		// consume, so read it here with two overlapping loads rather than
+		// a switch on its length after the loop: that switch is a jump
+		// table, and varying key lengths make it mispredict nearly every
+		// time. Before the loop, only k1 and k2 stay live across it, and
+		// the loads finish while it runs rather than after it. k1 is the
+		// first eight tail bytes, loaded exactly when n >= 8 and otherwise
+		// shifted down out of the last eight; k2 is what sits above those.
+		// A shift of 64 or more is zero in Go, so k2 is zero for a tail of
+		// eight or fewer, and mixing zero changes nothing, so the mixes
+		// need no guard.
 		n := len(data) & 15
 		var k1, k2 uint64
 		if n != 0 {
