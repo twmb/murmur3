@@ -67,7 +67,11 @@ func (d *digest128) Sum(b []byte) []byte {
 
 func (d *digest128) bmix(p []byte) (tail []byte) {
 	h1, h2 := d.h1, d.h2
-	for len(p) >= 16 {
+	for len(p) > 16 {
+		h1, h2 = mix128(h1, h2, load64(p), load64(p[8:]))
+		p = p[16:]
+	}
+	if len(p) >= 16 {
 		h1, h2 = mix128(h1, h2, load64(p), load64(p[8:]))
 		p = p[16:]
 	}

@@ -35,10 +35,11 @@ func SeedStringSum32(seed uint32, data string) (h1 uint32) {
 // the total number of bytes hashed. The one shot sums pass all of their
 // input; the streaming digest passes its leftover tail.
 func sum32[T bytestring](h1 uint32, data T, clen int) uint32 {
-	for len(data) >= 8 {
+	// Strictly greater for the same reason as in sum128: it removes the
+	// compiler's zero length pointer guard from the loop.
+	for len(data) > 4 {
 		h1 = mix32(h1, load32(data))
-		h1 = mix32(h1, load32(data[4:]))
-		data = data[8:]
+		data = data[4:]
 	}
 	if len(data) >= 4 {
 		h1 = mix32(h1, load32(data))

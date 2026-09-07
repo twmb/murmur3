@@ -39,7 +39,7 @@ Assembly
 Earlier versions shipped hand rolled amd64 assembly for the 64 and 128 bit
 sums. That assembly was removed once the compiler's output caught up: as of
 Go 1.27, the pure Go code is faster than the old assembly for every input
-under 128 bytes and within a few percent above that. The 32 bit assembly was
+under 32 bytes and within 3 to 8 percent above that. The 32 bit assembly was
 removed for the same reason back in Go 1.11. See the benchmarks below.
 
 Testing
@@ -47,8 +47,8 @@ Testing
 
 Testing includes comparing random inputs against the [canonical
 implementation](https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp),
-and testing length 0 through 100 inputs to force all branches of the unrolled
-loops and all tail lengths.
+and testing length 0 through 100 inputs to force the block loop, the trailing
+block, and all tail lengths.
 
 Because this code always reads input as little endian, testing against the
 canonical source is skipped for big endian architectures. The canonical source
@@ -59,46 +59,46 @@ Benchmarks
 ==========
 
 Measured with perf on Go 1.27.1 amd64 (Comet Lake i7-10710U) as user space
-cycles per call at a fixed iteration count, so CPU frequency and thermal
-throttling drop out. `asm` is the hand rolled amd64 assembly this library
-used to ship, `old Go` is the pure Go path every other architecture ran
-before, and `new Go` is the current code. The `Sizes` rows hash the block
-loop; the `Branches` rows hash 0 to 16 bytes and exercise the tail. Each row
-includes a few cycles of benchmark harness.
+cycles per call at a fixed iteration count, minimum of five runs, so CPU
+frequency and thermal throttling drop out. `asm` is the hand rolled amd64
+assembly this library used to ship, `old Go` is the pure Go path every other
+architecture ran before, and `new Go` is the current code. The `Sizes` rows
+hash the block loop; the `Branches` rows hash 0 to 16 bytes and exercise the
+tail. Each row includes a few cycles of benchmark harness.
 
 ```
 benchmark            asm  old Go  new Go   new/asm new/old
-128Sizes/8192       4187    4450    4662    +11.4%   +4.8%
-128Sizes/1024        530     570     619    +16.8%   +8.6%
-128Sizes/256         139     158     160    +14.8%   +1.0%
-128Sizes/64           48      52      51     +7.3%   -1.8%
-128Sizes/32           34      35      34     -1.1%   -2.8%
-128Branches/16        26      23      26     -0.9%  +11.0%
-128Branches/13        25      34      22    -12.5%  -35.8%
-128Branches/7         26      26      22    -15.3%  -17.7%
-128Branches/3         25      21      21    -16.6%   -2.8%
-64Sizes/8192        4184    4502    4663    +11.4%   +3.6%
-32Sizes/8192       10030   10008    9771     -2.6%   -2.4%
-32Sizes/64            87      87      79     -9.8%   -9.7%
-32Branches/3          15      15      17    +13.3%  +13.3%
+128Sizes/8192       4212    4477    4354     +3.4%   -2.7%
+128Sizes/1024        534     574     558     +4.6%   -2.7%
+128Sizes/256         140     156     151     +7.9%   -3.6%
+128Sizes/64           48      52      50     +4.4%   -4.3%
+128Sizes/32           35      36      35     -0.8%   -2.8%
+128Branches/16        26      23      26     -1.3%  +10.8%
+128Branches/13        25      34      22    -12.6%  -35.6%
+128Branches/7         26      26      22    -14.4%  -15.9%
+128Branches/3         25      22      21    -16.5%   -2.9%
+64Sizes/8192        4217    4532    4357     +3.3%   -3.9%
+32Sizes/8192       10076   10048    9765     -3.1%   -2.8%
+32Sizes/64            89      89      80    -10.1%  -10.1%
+32Sizes/32            50      50      44    -10.9%  -10.8%
+32Branches/3          15      15      17    +12.3%  +12.4%
 ```
 
-Per 16 byte block that is 8.2 cycles for the assembly and about 9.2 for the
-Go loop. The loop is bound by latency and by port pressure, not by
-instruction count: the four 64 bit multiplies per block and the LEAs share
-one execution port, and the loop carried h1 to h2 chain runs through those
-same instructions. The compiler already does the right thing here. It folds
-5*c1 + c2 into a single constant, which takes an add off that chain, and
-every attempt to help it (a four block unroll, constants hoisted into
-registers, a strictly greater loop bound to drop the reslice guard) produced
-fewer instructions and more cycles, up to 11.3 per block. What the assembly
-still buys is 22 instructions per block against 27 with the chain and port
-already saturated. Byte identical loops also land anywhere from 8.8 to 11
-cycles per block depending on which registers the allocator hands out,
-because a three address add becomes an LEA on the contended port, so a few
-percent either way between two Go versions is noise you cannot steer from
-source.
+Per 16 byte block that is 8.2 cycles for the assembly and 8.5 for the Go
+loop. The loop is bound by latency and by port pressure, not by instruction
+count: the four 64 bit multiplies per block and the LEAs share one execution
+port, and the loop carried h1 to h2 chain runs through those same
+instructions. The one change that helped was the strictly greater loop bound,
+which removes the zero length pointer guard the compiler emits after every
+reslice, four instructions per block, without touching the arithmetic.
+Everything else was measured and lost: unrolling two or four blocks per
+iteration, hoisting the constants into registers, and folding the two adds
+by hand all cut instructions and cost cycles, because the compiler's own
+folding of 5*c1 + c2 is what keeps the chain short, and because which
+registers the allocator hands out decides whether a three address add
+becomes an LEA on the contended port. Byte identical loops landed anywhere
+from 8.5 to 11 cycles per block on that alone.
 
 The 32 bit sum is bound by its own four cycle per block dependency chain and
-sits at about five; nothing above the algorithm changes that. Its gain at
-small sizes comes from the two block unroll.
+sits at about 4.8; nothing above the algorithm changes that. The strict bound
+is what it gains at 32 to 64 bytes.

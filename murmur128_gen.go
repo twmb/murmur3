@@ -38,12 +38,14 @@ func SeedStringSum128(seed1, seed2 uint64, data string) (h1 uint64, h2 uint64) {
 // with clen, the total number of bytes hashed. The one shot sums pass all
 // of their input; the streaming digest passes its leftover tail.
 func sum128[T bytestring](h1, h2 uint64, data T, clen int) (uint64, uint64) {
-	// Two blocks per iteration: the slice bookkeeping the compiler emits is
-	// a fair share of the loop, and unrolling halves it.
-	for len(data) >= 32 {
+	// The bound is strictly greater so the reslice can never leave zero
+	// bytes, which lets the compiler drop the pointer guard it otherwise
+	// emits for that case; the block that can be left over is taken below.
+	// Unrolling does not pay once the guard is gone: the loop is bound by
+	// the multiply port and the h1 to h2 chain, not by instruction count.
+	for len(data) > 16 {
 		h1, h2 = mix128(h1, h2, load64(data), load64(data[8:]))
-		h1, h2 = mix128(h1, h2, load64(data[16:]), load64(data[24:]))
-		data = data[32:]
+		data = data[16:]
 	}
 	if len(data) >= 16 {
 		h1, h2 = mix128(h1, h2, load64(data), load64(data[8:]))

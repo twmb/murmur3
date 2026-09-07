@@ -239,8 +239,8 @@ func TestUnaligned(t *testing.T) {
 }
 
 // TestBoundaries forces every block/tail path to be exercised for Sum32 and
-// Sum128: the unrolled loops, the single trailing block, and every tail
-// length, across several loop iterations.
+// Sum128: the block loop, the single trailing block, and every tail length,
+// across several loop iterations.
 func TestBoundaries(t *testing.T) {
 	const maxCheck = 100
 	var data [maxCheck]byte
