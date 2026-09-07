@@ -62,30 +62,31 @@ Benchmarks
 Cycles per call from perf (`cycles:u` at a fixed iteration count, minimum of
 three runs) on a Comet Lake i7-10710U, so CPU frequency and thermal
 throttling drop out. `asm` is the amd64 assembly this library shipped through
-v1.1.8; the other columns are this code built by that Go release. `Sizes`
+v1.1.8; the other columns are this code built by that Go release. Go 1.26
+is the minimum this module declares. `Sizes`
 rows exercise the block loop, `Branches` rows the 0 to 16 byte tail, and
 `RandomLengths` rows draw an xorshift length in [0, 64) on every call.
 
 ```
-benchmark              asm  go1.25  go1.26  go1.27   1.26/asm 1.27/asm
-128Branches/3           25      25      21      21     -16.7%   -16.7%
-128Branches/7           26      26      21      21     -18.6%   -18.5%
-128Branches/13          25      27      22      22     -12.5%   -14.5%
-128Branches/16          27      35      26      26      -1.4%    -1.3%
-128Sizes/32             35      46      34      34      -2.3%    -2.2%
-128Sizes/64             48      70      48      49      +1.2%    +1.2%
-128Sizes/256           140     209     149     149      +6.9%    +6.8%
-128Sizes/1024          534     769     567     557      +6.2%    +4.3%
-128Sizes/8192         4215    6212    4361    4363      +3.5%    +3.5%
-64Sizes/32              35      46      34      34      -3.7%    -3.5%
-64Sizes/1024           535     788     575     557      +7.4%    +4.1%
-64Sizes/8192          4221    6326    4360    4366      +3.3%    +3.4%
-32Branches/3            15      19      16      16      +5.2%    +5.6%
-32Sizes/32              50      56      41      41     -18.2%   -18.0%
-32Sizes/64              89      97      77      77     -13.6%   -13.6%
-32Sizes/256            322     339     296     302      -7.9%    -6.2%
-32Sizes/1024          1284    1335    1243    1211      -3.2%    -5.7%
-32Sizes/8192         10080   10405    9896    9582      -1.8%    -4.9%
-RandomLengths128       110      88      91      90     -18.0%   -18.2%
-RandomLengths32         96      88      83      85     -13.5%   -11.4%
+benchmark              asm  go1.26  go1.27   1.26/asm 1.27/asm
+128Branches/3           25      21      21     -16.7%   -16.7%
+128Branches/7           26      21      21     -18.6%   -18.5%
+128Branches/13          25      22      22     -12.5%   -14.5%
+128Branches/16          27      26      26      -1.4%    -1.3%
+128Sizes/32             35      34      34      -2.3%    -2.2%
+128Sizes/64             48      48      49      +1.2%    +1.2%
+128Sizes/256           140     149     149      +6.9%    +6.8%
+128Sizes/1024          534     567     557      +6.2%    +4.3%
+128Sizes/8192         4215    4361    4363      +3.5%    +3.5%
+64Sizes/32              35      34      34      -3.7%    -3.5%
+64Sizes/1024           535     575     557      +7.4%    +4.1%
+64Sizes/8192          4221    4360    4366      +3.3%    +3.4%
+32Branches/3            15      16      16      +5.2%    +5.6%
+32Sizes/32              50      41      41     -18.2%   -18.0%
+32Sizes/64              89      77      77     -13.6%   -13.6%
+32Sizes/256            322     296     302      -7.9%    -6.2%
+32Sizes/1024          1284    1243    1211      -3.2%    -5.7%
+32Sizes/8192         10080    9896    9582      -1.8%    -4.9%
+RandomLengths128       110      91      90     -18.0%   -18.2%
+RandomLengths32         96      83      85     -13.5%   -11.4%
 ```
