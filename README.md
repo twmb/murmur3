@@ -38,10 +38,10 @@ Assembly
 
 Earlier versions shipped hand rolled amd64 assembly for the 64 and 128 bit
 sums. That assembly was removed once the compiler's output caught up: as of
-Go 1.27, the pure Go code is faster than the old assembly at every size
-measured except 256 bytes, where it is 3 percent slower, and on Go 1.26 it is
-8 percent slower from 256 bytes up. The 32 bit assembly was removed for the
-same reason back in Go 1.11. See the benchmarks below.
+Go 1.27, the pure Go code is faster than the old assembly for every input
+under 64 bytes, for keys of varying length, and for every 32 bit sum, and 1
+to 7 percent slower on fixed inputs of 64 bytes and more. The 32 bit assembly
+was removed for the same reason back in Go 1.11. See the benchmarks below.
 
 Testing
 =======
@@ -68,29 +68,31 @@ throttling drop out. `asm` is the amd64 assembly this library used to ship,
 
 ```
 benchmark                asm  old Go  new Go   new/asm new/old
-128Sizes/8192           4215    4475    4134     -1.9%   -7.6%
-128Sizes/1024            535     574     529     -1.1%   -7.9%
-128Sizes/256             140     157     144     +2.6%   -8.3%
-128Sizes/64               48      52      48     +0.6%   -7.9%
-128Sizes/32               35      36      35     -1.1%   -3.2%
-128Branches/16            26      24      26     -0.5%  +10.2%
-128Branches/13            25      34      21    -16.5%  -38.8%
-128Branches/7             26      26      21    -18.7%  -19.8%
-128Branches/3             25      22      20    -20.3%   -7.3%
-64Sizes/8192            4215    4533    4126     -2.1%   -9.0%
-64Sizes/32                35      38      34     -2.7%   -9.5%
-32Sizes/8192           10071   10050    9809     -2.6%   -2.4%
-32Sizes/64                89      88      77    -13.6%  -13.5%
-32Sizes/32                50      50      41    -17.7%  -17.6%
-32Branches/3              15      15      16     +5.7%   +5.9%
-RandomLengths128         110      96      88    -20.2%   -8.4%
-RandomLengths32           96      96      85    -11.7%  -11.9%
+128Sizes/8192           4217    4479    4364     +3.5%   -2.6%
+128Sizes/1024            534     576     557     +4.3%   -3.4%
+128Sizes/256             140     159     149     +6.8%   -6.0%
+128Sizes/64               48      52      49     +1.5%   -7.1%
+128Sizes/32               35      36      34     -2.1%   -3.9%
+128Branches/16            26      23      26     -1.4%  +10.8%
+128Branches/13            25      34      21    -14.5%  -37.1%
+128Branches/7             26      26      21    -18.5%  -19.7%
+128Branches/3             25      22      21    -16.4%   -3.1%
+64Sizes/8192            4216    4533    4362     +3.5%   -3.8%
+64Sizes/32                35      38      34     -3.5%  -10.7%
+32Sizes/8192           10216   10191    9585     -6.2%   -5.9%
+32Sizes/64                89      88      76    -13.6%  -13.6%
+32Sizes/32                50      49      41    -18.1%  -18.0%
+32Branches/3              15      15      16     +5.6%   +5.8%
+RandomLengths128         110      96      90    -18.1%   -5.8%
+RandomLengths32           95      96      84    -11.6%  -12.0%
 ```
 
-Per 16 byte block the assembly is 8.2 cycles and the Go loop 8.1 on Go 1.27
-and 9.3 on Go 1.26; the two compilers emit the same instructions with one
-register named differently, and the REX prefix shifts the port binding onto
-the multiply port. The tail is read out of the input's last 16 bytes with two
-overlapping loads rather than a switch on its length, which is a jump table
-and mispredicts on varying key lengths. The 32 bit sum sits on its four cycle
-per block dependency chain.
+Per 16 byte block the assembly is 8.2 cycles and the Go loop 8.5, on both Go
+1.26 and 1.27. The loop indexes data[i:i+16] with a hoisted bound rather than
+reslicing, which is three fewer instructions per block. Holding the two
+multipliers in registers instead of constants measured 8.1 on Go 1.27 and 9.3
+on Go 1.26, the difference being one register name and its REX prefix, so
+they stay constants. The tail is read out of the input's last 16 bytes with
+two overlapping loads rather than a switch on its length, which is a jump
+table and mispredicts on varying key lengths. The 32 bit sum sits on its four
+cycle per block dependency chain.
