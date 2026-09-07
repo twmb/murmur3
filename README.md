@@ -110,8 +110,11 @@ the allocator hands out decides whether a three address add is an ADD or an
 LEA. Byte identical loops landed anywhere from 8.5 to 11 cycles per block on
 that alone. That also makes the result a property of the compiler version:
 Go 1.26 and 1.27 both produce the 8.5 cycle loop from this source, while Go
-1.25 emits four more instructions for it and lands at 9.5. GOAMD64=v3
-changes nothing.
+1.25 emits four more instructions for it and lands at 9.5. The best shape
+found on Go 1.27, an index loop over data[i:i+16] with the two multipliers
+loaded once into locals, measures 8.1 cycles per block there, but 9.2 on Go
+1.26 and 10.9 on Go 1.25, so it is not used: this loop is the one that is
+stable across the supported compilers. GOAMD64=v3 changes nothing.
 
 The tail is where the two differ most, in both directions. On a fixed length
 every branch in a tail is perfectly predicted, and the Go code wins by
