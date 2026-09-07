@@ -38,11 +38,10 @@ Assembly
 
 Earlier versions shipped hand rolled amd64 assembly for the 64 and 128 bit
 sums. That assembly was removed once the compiler's output caught up: as of
-Go 1.27, the pure Go code is faster than the old assembly for every input
-under 64 bytes, for keys of varying length, and for every 32 bit sum, and 3
-to 9 percent slower on fixed inputs of 256 bytes and more. The 32 bit
-assembly was removed for the same reason back in Go 1.11. See the benchmarks
-below.
+Go 1.27, the pure Go code is faster than the old assembly at every size
+measured except 256 bytes, where it is 3 percent slower, and on Go 1.26 it is
+8 percent slower from 256 bytes up. The 32 bit assembly was removed for the
+same reason back in Go 1.11. See the benchmarks below.
 
 Testing
 =======
@@ -72,49 +71,60 @@ predictor. Each row includes a few cycles of benchmark harness.
 
 ```
 benchmark                asm  old Go  new Go   new/asm new/old
-128Sizes/8192           4213    4479    4387     +4.1%   -2.1%
-128Sizes/1024            534     574     569     +6.6%   -0.9%
-128Sizes/256             140     156     152     +8.6%   -2.9%
-128Sizes/64               48      52      49     +1.4%   -7.1%
-128Sizes/32               35      36      34     -2.6%   -4.2%
-128Branches/16            26      23      25     -5.1%   +6.6%
-128Branches/13            25      34      21    -14.4%  -37.0%
-128Branches/7             26      26      21    -18.2%  -19.7%
-128Branches/3             25      22      21    -16.5%   -3.0%
-64Sizes/8192            4215    4530    4332     +2.8%   -4.4%
-64Sizes/32                35      38      34     -3.1%  -10.2%
-32Sizes/8192           10074   10045    9897     -1.8%   -1.5%
-32Sizes/64                88      88      78    -11.5%  -11.5%
-32Sizes/32                50      50      42    -14.6%  -14.5%
-32Branches/3              15      15      16     +5.6%   +5.7%
-RandomLengths128         110      96      89    -19.0%   -6.8%
-RandomLengths32           95      96      87     -8.8%   -9.3%
+128Sizes/8192           4215    4475    4134     -1.9%   -7.6%
+128Sizes/1024            535     574     529     -1.1%   -7.9%
+128Sizes/256             140     157     144     +2.6%   -8.3%
+128Sizes/64               48      52      48     +0.6%   -7.9%
+128Sizes/32               35      36      35     -1.1%   -3.2%
+128Branches/16            26      24      26     -0.5%  +10.2%
+128Branches/13            25      34      21    -16.5%  -38.8%
+128Branches/7             26      26      21    -18.7%  -19.8%
+128Branches/3             25      22      20    -20.3%   -7.3%
+64Sizes/8192            4215    4533    4126     -2.1%   -9.0%
+64Sizes/32                35      38      34     -2.7%   -9.5%
+32Sizes/8192           10071   10050    9809     -2.6%   -2.4%
+32Sizes/64                89      88      77    -13.6%  -13.5%
+32Sizes/32                50      50      41    -17.7%  -17.6%
+32Branches/3              15      15      16     +5.7%   +5.9%
+RandomLengths128         110      96      88    -20.2%   -8.4%
+RandomLengths32           96      96      85    -11.7%  -11.9%
 ```
 
-Per 16 byte block that is 8.2 cycles for the assembly and 8.5 for the Go
-loop, and perf's port counters say where the difference is. The Go loop
-issues 29 micro ops per block to the assembly's 19, so on a four wide core its
-floor is 7.3 cycles and ports 0, 1 and 6 each run 75 to 80 percent busy; the
-measured 8.5 is scheduling slack on top of that. The assembly has slack on
-every port and sits on its dependency chain instead: the four 64 bit
-multiplies and the rotates are off that chain, and what is left is h1 to h2
-through two three operand LEAs at three cycles each. The one loop change that
-helped was the strictly greater bound, which removes the zero length pointer
-guard the compiler emits after every reslice, four micro ops per block,
-without touching the arithmetic. Everything else was measured and lost:
-unrolling two or four blocks per iteration, hoisting the constants into
-registers, folding the two adds by hand, and moving the loop into its own
-function. Cutting micro ops only wins if the h1 to h2 chain stays at the five
-cycles the compiler's own folding of 5*c1 + c2 gives it, and which registers
-the allocator hands out decides whether a three address add is an ADD or an
-LEA. Byte identical loops landed anywhere from 8.5 to 11 cycles per block on
-that alone. That also makes the result a property of the compiler version:
-Go 1.26 and 1.27 both produce the 8.5 cycle loop from this source, while Go
-1.25 emits four more instructions for it and lands at 9.5. The best shape
-found on Go 1.27, an index loop over data[i:i+16] with the two multipliers
-loaded once into locals, measures 8.1 cycles per block there, but 9.2 on Go
-1.26 and 10.9 on Go 1.25, so it is not used: this loop is the one that is
-stable across the supported compilers. GOAMD64=v3 changes nothing.
+Per 16 byte block that is 8.2 cycles for the assembly and 8.1 for the Go
+loop on Go 1.27, and perf's port counters say what governs it. The block loop
+issues 23 instructions per block: two loads, four multiplies, four rotates,
+two xors, five LEAs, one ten byte immediate, one counter add and a fused
+compare and branch. The four multiplies can only run on port 1 and the LEAs
+only on ports 1 and 5, so port 1 is the contended resource, and the loop
+carried h1 to h2 chain is five cycles because the compiler folds 5*c1 + c2
+into a single constant, which takes an add off that chain. The assembly is
+19 instructions with slack on every port and sits on its own eight cycle
+chain, two three operand LEAs at three cycles each.
+
+Three things in the source were chosen against measurement. The loop is an
+index loop over data[i:i+16] with the bound hoisted by hand rather than a
+reslicing loop: the compiler proves the window from the bound, folds the
+index into the loads, and advances one counter instead of a pointer, a length
+and a capacity, which is three fewer instructions and two fewer LEAs per
+block. The two multipliers are loaded once from variables rather than written
+as constants, because the compiler rematerializes a constant with a ten byte
+MOVQ at every use inside a loop. And nothing else: unrolling, folding the
+adds by hand so the folded constant could live in a register too, moving the
+loop into its own function, and pointer arithmetic through unsafe were all
+measured and lost, by lengthening the chain, by handing the allocator a
+problem it solved with LEAs on the contended port, or in unsafe's case by
+the checks unsafe.Slice inserts.
+
+Byte identical loops can still differ by 15 percent, and perf showed why. Go
+1.26 and 1.27 emit this exact loop with one register named differently, R13
+against CX. R13 needs a REX prefix, so the loop is three bytes longer, the
+micro op cache groups it differently for the allocator, and the port binding
+heuristic puts one more micro op per block on port 1: 9.3 cycles per block on
+Go 1.26 against 8.1 on 1.27. Go 1.25 cannot prove the window in bounds and
+spills, 10.7. The reslicing loop this replaced measured 8.5 on both 1.26 and
+1.27. This shape is kept because its floor is lower on every compiler from
+1.26 on, and which register name a release picks is not something source
+controls. GOAMD64=v3 changes nothing.
 
 The tail is where the two differ most, in both directions. On a fixed length
 every branch in a tail is perfectly predicted, and the Go code wins by
@@ -135,4 +145,5 @@ the inliner's budget and saves a call per hash.
 
 The 32 bit sum is bound by its own four cycle per block dependency chain and
 sits at 4.8 with every port under 80 percent busy; nothing above the
-algorithm changes that. The strict bound is what it gains at 32 to 64 bytes.
+algorithm changes that. The index loop, which has no reslice guard, is what
+it gains at 32 to 64 bytes.

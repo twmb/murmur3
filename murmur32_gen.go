@@ -45,12 +45,9 @@ func sum32[T bytestring](h1 uint32, data T, clen int) uint32 {
 			end := data[len(data)-4:]
 			k1 = load32(end[:4]) >> (8 * uint(4-n))
 		}
-		for len(data) > 4 {
-			h1 = mix32(h1, load32(data))
-			data = data[4:]
-		}
-		if len(data) >= 4 {
-			h1 = mix32(h1, load32(data))
+		// An index loop with a hoisted bound, as in sum128.
+		for i, end := 0, len(data)-4; i <= end; i += 4 {
+			h1 = mix32(h1, load32(data[i:i+4]))
 		}
 
 		if n != 0 {

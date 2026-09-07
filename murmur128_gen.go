@@ -52,6 +52,7 @@ func sum128[T bytestring](h1, h2 uint64, data T, clen int) (uint64, uint64) {
 		// in Go, so k2 is zero for a tail of eight bytes or fewer, and
 		// mixing zero changes nothing, so the mixes need no guard of
 		// their own.
+		m1, m2 := mul1_128, mul2_128
 		n := len(data) & 15
 		var k1, k2 uint64
 		if n != 0 {
@@ -60,12 +61,14 @@ func sum128[T bytestring](h1, h2 uint64, data T, clen int) (uint64, uint64) {
 			k1 = load64(end[16-m:24-m]) >> (8 * uint(8-min(n, 8)))
 			k2 = load64(end[8:]) >> (8 * uint(16-n))
 		}
-		for len(data) > 16 {
-			h1, h2 = mix128(h1, h2, load64(data), load64(data[8:]))
-			data = data[16:]
-		}
-		if len(data) >= 16 {
-			h1, h2 = mix128(h1, h2, load64(data), load64(data[8:]))
+		// An index loop rather than a reslicing one: the compiler proves
+		// the window from the loop bound, folds the index into the loads,
+		// and has one counter to advance instead of a pointer, a length
+		// and a capacity. The bound is hoisted by hand because Go 1.26
+		// recomputes it every iteration otherwise; 1.27 hoists it itself.
+		for i, end := 0, len(data)-16; i <= end; i += 16 {
+			b := data[i : i+16]
+			h1, h2 = mix128(h1, h2, load64(b), load64(b[8:]), m1, m2)
 		}
 
 		if n != 0 {

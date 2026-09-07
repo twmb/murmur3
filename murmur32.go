@@ -53,16 +53,12 @@ func (d *digest32) Sum(b []byte) []byte {
 // Digest as many blocks as possible.
 func (d *digest32) bmix(p []byte) (tail []byte) {
 	h1 := d.h1
-	for len(p) > 4 {
-		h1 = mix32(h1, load32(p))
-		p = p[4:]
-	}
-	if len(p) >= 4 {
-		h1 = mix32(h1, load32(p))
-		p = p[4:]
+	i := 0
+	for end := len(p) - 4; i <= end; i += 4 {
+		h1 = mix32(h1, load32(p[i:i+4]))
 	}
 	d.h1 = h1
-	return p
+	return p[i:]
 }
 
 func (d *digest32) Sum32() (h1 uint32) {
