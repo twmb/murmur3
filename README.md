@@ -59,15 +59,12 @@ use different numbers for its hashing.
 Benchmarks
 ==========
 
-Measured with perf on Go 1.27.1 amd64 (Comet Lake i7-10710U) as user space
-cycles per call at a fixed iteration count, minimum of five runs, so CPU
-frequency and thermal throttling drop out. `asm` is the hand rolled amd64
-assembly this library used to ship, `old Go` is the pure Go path every other
-architecture ran before, and `new Go` is the current code. The `Sizes` rows
-hash the block loop; the `Branches` rows hash 0 to 16 bytes and exercise the
-tail; the `RandomLengths` rows draw a fresh xorshift length in [0, 64) on
-every call, which is what a real key stream looks like to the branch
-predictor. Each row includes a few cycles of benchmark harness.
+Cycles per call from perf (`cycles:u` at a fixed iteration count, minimum of
+five runs) on Go 1.27.1, Comet Lake i7-10710U, so CPU frequency and thermal
+throttling drop out. `asm` is the amd64 assembly this library used to ship,
+`old Go` the pure Go path other architectures ran, `new Go` the current code.
+`Sizes` rows exercise the block loop, `Branches` rows the 0 to 16 byte tail,
+`RandomLengths` rows draw an xorshift length in [0, 64) on every call.
 
 ```
 benchmark                asm  old Go  new Go   new/asm new/old
@@ -90,60 +87,10 @@ RandomLengths128         110      96      88    -20.2%   -8.4%
 RandomLengths32           96      96      85    -11.7%  -11.9%
 ```
 
-Per 16 byte block that is 8.2 cycles for the assembly and 8.1 for the Go
-loop on Go 1.27, and perf's port counters say what governs it. The block loop
-issues 23 instructions per block: two loads, four multiplies, four rotates,
-two xors, five LEAs, one ten byte immediate, one counter add and a fused
-compare and branch. The four multiplies can only run on port 1 and the LEAs
-only on ports 1 and 5, so port 1 is the contended resource, and the loop
-carried h1 to h2 chain is five cycles because the compiler folds 5*c1 + c2
-into a single constant, which takes an add off that chain. The assembly is
-19 instructions with slack on every port and sits on its own eight cycle
-chain, two three operand LEAs at three cycles each.
-
-Three things in the source were chosen against measurement. The loop is an
-index loop over data[i:i+16] with the bound hoisted by hand rather than a
-reslicing loop: the compiler proves the window from the bound, folds the
-index into the loads, and advances one counter instead of a pointer, a length
-and a capacity, which is three fewer instructions and two fewer LEAs per
-block. The two multipliers are loaded once from variables rather than written
-as constants, because the compiler rematerializes a constant with a ten byte
-MOVQ at every use inside a loop. And nothing else: unrolling, folding the
-adds by hand so the folded constant could live in a register too, moving the
-loop into its own function, and pointer arithmetic through unsafe were all
-measured and lost, by lengthening the chain, by handing the allocator a
-problem it solved with LEAs on the contended port, or in unsafe's case by
-the checks unsafe.Slice inserts.
-
-Byte identical loops can still differ by 15 percent, and perf showed why. Go
-1.26 and 1.27 emit this exact loop with one register named differently, R13
-against CX. R13 needs a REX prefix, so the loop is three bytes longer, the
-micro op cache groups it differently for the allocator, and the port binding
-heuristic puts one more micro op per block on port 1: 9.3 cycles per block on
-Go 1.26 against 8.1 on 1.27. Go 1.25 cannot prove the window in bounds and
-spills, 10.7. The reslicing loop this replaced measured 8.5 on both 1.26 and
-1.27. This shape is kept because its floor is lower on every compiler from
-1.26 on, and which register name a release picks is not something source
-controls. GOAMD64=v3 changes nothing.
-
-The tail is where the two differ most, in both directions. On a fixed length
-every branch in a tail is perfectly predicted, and the Go code wins by
-reading the tail in two or three word sized loads where the assembly walks a
-tree of byte loads. On varying lengths a switch on the tail length is a jump
-table, an indirect branch that mispredicts nearly every time the length
-changes, and each miss is about 20 cycles: on a mixed stream the first
-version of this code took 0.94 mispredicts per hash to the assembly's 0.30
-and was 34 percent slower. So once an input has had a full block, the tail is
-read out of the input's last 16 bytes, which are always in bounds, with two
-overlapping loads and shifts that the length selects without a branch, and
-this happens before the block loop so that only two words stay live across
-it. Only inputs shorter than one block take the switch. That is what the
-RandomLengths rows measure: 19 percent under the assembly for 128 bit sums
-and 9 percent for 32 bit. Sum64 and its variants call the shared
-implementation directly rather than through Sum128, which kept them under
-the inliner's budget and saves a call per hash.
-
-The 32 bit sum is bound by its own four cycle per block dependency chain and
-sits at 4.8 with every port under 80 percent busy; nothing above the
-algorithm changes that. The index loop, which has no reslice guard, is what
-it gains at 32 to 64 bytes.
+Per 16 byte block the assembly is 8.2 cycles and the Go loop 8.1 on Go 1.27
+and 9.3 on Go 1.26; the two compilers emit the same instructions with one
+register named differently, and the REX prefix shifts the port binding onto
+the multiply port. The tail is read out of the input's last 16 bytes with two
+overlapping loads rather than a switch on its length, which is a jump table
+and mispredicts on varying key lengths. The 32 bit sum sits on its four cycle
+per block dependency chain.
