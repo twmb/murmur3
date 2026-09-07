@@ -97,7 +97,10 @@ by hand all cut instructions and cost cycles, because the compiler's own
 folding of 5*c1 + c2 is what keeps the chain short, and because which
 registers the allocator hands out decides whether a three address add
 becomes an LEA on the contended port. Byte identical loops landed anywhere
-from 8.5 to 11 cycles per block on that alone.
+from 8.5 to 11 cycles per block on that alone. That also makes the result a
+property of the compiler version: Go 1.26 and 1.27 both produce the 8.5
+cycle loop from this source, while Go 1.25 emits four more instructions for
+it and lands at 9.5, slower than the two block unroll it replaced.
 
 The 32 bit sum is bound by its own four cycle per block dependency chain and
 sits at about 4.8; nothing above the algorithm changes that. The strict bound
