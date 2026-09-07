@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ['1.25', oldstable, stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go vet ./...
+      - run: go test -race ./...
+      # The tests need cgo for the canonical C++ reference, so cross arch
+      # checks only build the library: a 32 bit arch and a big endian arch.
+      - run: GOARCH=386 go build .
+      - run: GOARCH=ppc64 go build .

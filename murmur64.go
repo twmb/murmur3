@@ -8,6 +8,7 @@ import (
 var (
 	_ hash.Hash   = new(digest64)
 	_ hash.Hash64 = new(digest64)
+	_ hash.Cloner = new(digest64)
 	_ bmixer      = new(digest64)
 )
 
@@ -37,11 +38,20 @@ func (d *digest64) Sum64() uint64 {
 	return h1
 }
 
+// Clone returns a copy of the hash. Writes to either copy do not affect the
+// other. The returned hash is a hash.Hash64.
+func (d *digest64) Clone() (hash.Cloner, error) {
+	c := *d
+	c.reseat((*digest128)(&c))
+	return &c, nil
+}
+
 // Sum64 returns the murmur3 sum of data. It is equivalent to the following
 // sequence (without the extra burden and the extra allocation):
-//     hasher := New64()
-//     hasher.Write(data)
-//     return hasher.Sum64()
+//
+//	hasher := New64()
+//	hasher.Write(data)
+//	return hasher.Sum64()
 func Sum64(data []byte) uint64 {
 	h1, _ := Sum128(data)
 	return h1

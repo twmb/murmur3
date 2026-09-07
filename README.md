@@ -1,18 +1,20 @@
 murmur3
 =======
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/twmb/murmur3.svg)](https://pkg.go.dev/github.com/twmb/murmur3)
+[![ci](https://github.com/twmb/murmur3/actions/workflows/ci.yml/badge.svg)](https://github.com/twmb/murmur3/actions/workflows/ci.yml)
+
 Native Go implementation of Austin Appleby's third MurmurHash revision (aka
 MurmurHash3).
 
-Includes assembly for amd64 for 64/128 bit hashes, seeding functions,
-and string functions to avoid string to slice conversions.
+Includes 32, 64, and 128 bit sums, seeding functions, string functions that
+hash without converting to a slice, and streaming hashes implementing Go's
+standard [Hash](https://pkg.go.dev/hash#Hash) and
+[Cloner](https://pkg.go.dev/hash#Cloner) interfaces.
 
-Hand rolled 32 bit assembly was removed during 1.11, but may be reintroduced
-if the compiler slows down any more. As is, the compiler generates marginally
-slower code (by one instruction in the hot loop).
-
-The reference algorithm has been slightly hacked as to support the streaming mode
-required by Go's standard [Hash interface](http://golang.org/pkg/hash/#Hash).
+This library started as a fork of [spaolacci/murmur3](https://github.com/spaolacci/murmur3).
+The reference algorithm has been slightly hacked as to support the streaming
+mode required by Go's standard Hash interface.
 
 Endianness
 ==========
@@ -24,106 +26,159 @@ does mean that hashing is a bit slower on big endian architectures.
 Safety
 ======
 
-This library used to use `unsafe` to convert four bytes to a `uint32` and eight
-bytes to a `uint64`, but Go 1.14 introduced checks around those types of
-conversions that flagged that code as erroneous when hashing on unaligned
-input. While the code would not be problematic on amd64, it could be
-problematic on some architectures.
+This library uses no `unsafe`. Bytes are read with plain indexing, which the
+compiler turns into single word sized loads on architectures that allow
+unaligned access, and the loops are shaped so that the compiler proves every
+index in bounds. Strings are hashed through one implementation generic over
+`string | []byte`, so hashing a string does not copy it and does not
+allocate.
 
-As of Go 1.14, those conversions were removed at the expense of a very minor
-performance hit. This hit affects all cpu architectures on for `Sum32`, and
-non-amd64 architectures for `Sum64` and `Sum128`. For 64 and 128, custom
-assembly exists for amd64 that preserves performance.
+Assembly
+========
+
+Earlier versions shipped hand rolled amd64 assembly for the 64 and 128 bit
+sums. That assembly was removed once the compiler's output caught up: as of
+Go 1.27, the pure Go code is faster than the old assembly for every input
+under 128 bytes and within a few percent above that. The 32 bit assembly was
+removed for the same reason back in Go 1.11. See the benchmarks below.
 
 Testing
 =======
 
-[![Build Status](https://travis-ci.org/twmb/murmur3.svg?branch=master)](https://travis-ci.org/twmb/murmur3)
-
 Testing includes comparing random inputs against the [canonical
 implementation](https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp),
-and testing length 0 through 17 inputs to force all branches.
+and testing length 0 through 100 inputs to force all branches of the unrolled
+loops and all tail lengths.
 
 Because this code always reads input as little endian, testing against the
 canonical source is skipped for big endian architectures. The canonical source
 just converts bytes to numbers, meaning on big endian architectures, it will
 use different numbers for its hashing.
 
-Documentation
-=============
-
-[![GoDoc](https://godoc.org/github.com/twmb/murmur3?status.svg)](https://godoc.org/github.com/twmb/murmur3)
-
-Full documentation can be found on `godoc`.
-
 Benchmarks
 ==========
 
-Benchmarks below were run on an amd64 machine with _and_ without the custom
-assembly. The following numbers are for Go 1.14.1 and are comparing against
-[spaolacci/murmur3](https://github.com/spaolacci/murmur3).
+All numbers below are from Go 1.27.1 on an amd64 laptop (i7-10710U) that
+thermally throttles, so treat them as directional: the three builds were run
+interleaved, round robin, pinned to one core, nine rounds each, and benchstat
+reports the median and spread. On a machine that does not throttle the spread
+should collapse to a percent or two. To reproduce, build the test binary at
+the old and new commits and alternate runs of each.
 
-You will notice that at small sizes, the other library is better. This is due
-to this library converting to safe code for Go 1.14. At large sizes, this
-library is nearly identical to the other. On amd64, the 64 bit and 128 bit
-sums come out to ~9% faster.
+The `Branches` benchmarks hash 0 to 16 bytes and exercise the tail switch.
+The `Sizes` benchmarks hash 32 bytes to 8 KiB and exercise the block loop.
 
-32 bit sums:
-
-```
-32Sizes/32-12     3.00GB/s ± 1%  2.12GB/s ±11%  -29.24%  (p=0.000 n=9+10)
-32Sizes/64-12     3.61GB/s ± 3%  2.79GB/s ± 8%  -22.62%  (p=0.000 n=10+10)
-32Sizes/128-12    3.47GB/s ± 8%  2.79GB/s ± 4%  -19.47%  (p=0.000 n=10+10)
-32Sizes/256-12    3.66GB/s ± 4%  3.25GB/s ± 6%  -11.09%  (p=0.000 n=10+10)
-32Sizes/512-12    3.78GB/s ± 3%  3.54GB/s ± 4%   -6.30%  (p=0.000 n=9+9)
-32Sizes/1024-12   3.86GB/s ± 3%  3.69GB/s ± 5%   -4.46%  (p=0.000 n=10+10)
-32Sizes/2048-12   3.85GB/s ± 3%  3.81GB/s ± 3%     ~     (p=0.079 n=10+9)
-32Sizes/4096-12   3.90GB/s ± 3%  3.82GB/s ± 2%   -2.14%  (p=0.029 n=10+10)
-32Sizes/8192-12   3.82GB/s ± 3%  3.78GB/s ± 7%     ~     (p=0.529 n=10+10)
-```
-
-64/128 bit sums, non-amd64:
+Old hand rolled amd64 assembly (left) versus the current pure Go (right):
 
 ```
-64Sizes/32-12     2.34GB/s ± 5%  2.64GB/s ± 9%  +12.87%  (p=0.000 n=10+10)
-64Sizes/64-12     3.62GB/s ± 5%  3.96GB/s ± 4%   +9.41%  (p=0.000 n=10+10)
-64Sizes/128-12    5.12GB/s ± 3%  5.44GB/s ± 4%   +6.09%  (p=0.000 n=10+9)
-64Sizes/256-12    6.35GB/s ± 2%  6.27GB/s ± 9%     ~     (p=0.796 n=10+10)
-64Sizes/512-12    6.58GB/s ± 7%  6.79GB/s ± 3%     ~     (p=0.075 n=10+10)
-64Sizes/1024-12   7.49GB/s ± 3%  7.55GB/s ± 9%     ~     (p=0.393 n=10+10)
-64Sizes/2048-12   8.06GB/s ± 2%  7.90GB/s ± 6%     ~     (p=0.156 n=9+10)
-64Sizes/4096-12   8.27GB/s ± 6%  8.22GB/s ± 5%     ~     (p=0.631 n=10+10)
-64Sizes/8192-12   8.35GB/s ± 4%  8.38GB/s ± 6%     ~     (p=0.631 n=10+10)
-128Sizes/32-12    2.27GB/s ± 2%  2.68GB/s ± 5%  +18.00%  (p=0.000 n=10+10)
-128Sizes/64-12    3.55GB/s ± 2%  4.00GB/s ± 3%  +12.47%  (p=0.000 n=8+9)
-128Sizes/128-12   5.09GB/s ± 1%  5.43GB/s ± 3%   +6.65%  (p=0.000 n=9+9)
-128Sizes/256-12   6.33GB/s ± 3%  5.65GB/s ± 4%  -10.79%  (p=0.000 n=9+10)
-128Sizes/512-12   6.78GB/s ± 3%  6.74GB/s ± 6%     ~     (p=0.968 n=9+10)
-128Sizes/1024-12  7.46GB/s ± 4%  7.56GB/s ± 4%     ~     (p=0.222 n=9+9)
-128Sizes/2048-12  7.99GB/s ± 4%  7.96GB/s ± 3%     ~     (p=0.666 n=9+9)
-128Sizes/4096-12  8.20GB/s ± 2%  8.25GB/s ± 4%     ~     (p=0.631 n=10+10)
-128Sizes/8192-12  8.24GB/s ± 2%  8.26GB/s ± 5%     ~     (p=0.673 n=8+9)
+               │ rr_asm_c.txt │             rr_new_c.txt             │
+               │    sec/op    │    sec/op      vs base               │
+32Branches/0     2.635n ±  7%    2.726n ± 10%   +3.45% (p=0.008 n=9)
+32Branches/1     2.653n ± 12%    2.713n ± 13%        ~ (p=0.258 n=9)
+32Branches/2     2.925n ± 11%    3.263n ±  8%  +11.56% (p=0.014 n=9)
+32Branches/3     3.207n ±  7%    3.435n ± 10%   +7.11% (p=0.019 n=9)
+32Branches/4     3.334n ± 11%    3.415n ± 16%        ~ (p=0.621 n=9)
+128Branches/0    3.629n ± 12%    3.813n ± 11%   +5.07% (p=0.024 n=9)
+128Branches/1    4.742n ± 11%    4.113n ± 10%  -13.26% (p=0.001 n=9)
+128Branches/2    5.147n ± 12%    4.192n ± 10%  -18.55% (p=0.000 n=9)
+128Branches/3    5.375n ± 11%    4.367n ± 10%  -18.75% (p=0.000 n=9)
+128Branches/4    4.577n ± 10%    4.012n ± 13%  -12.34% (p=0.001 n=9)
+128Branches/5    4.977n ± 12%    4.233n ± 10%  -14.95% (p=0.000 n=9)
+128Branches/6    5.271n ±  9%    4.293n ±  8%  -18.55% (p=0.000 n=9)
+128Branches/7    5.568n ± 10%    4.461n ± 10%  -19.88% (p=0.000 n=9)
+128Branches/8    4.463n ± 11%    4.098n ±  7%   -8.18% (p=0.002 n=9)
+128Branches/9    5.230n ±  9%    4.446n ±  5%  -14.99% (p=0.000 n=9)
+128Branches/10   5.683n ±  8%    4.223n ± 11%  -25.69% (p=0.000 n=9)
+128Branches/11   6.021n ±  7%    4.573n ±  7%  -24.05% (p=0.000 n=9)
+128Branches/12   4.937n ± 12%    4.249n ±  9%  -13.94% (p=0.000 n=9)
+128Branches/13   5.398n ± 10%    4.482n ±  9%  -16.97% (p=0.000 n=9)
+128Branches/14   5.874n ± 10%    4.473n ±  9%  -23.85% (p=0.000 n=9)
+128Branches/15   5.726n ± 11%    4.714n ±  8%  -17.67% (p=0.000 n=9)
+128Branches/16   5.642n ± 11%    5.388n ± 13%        ~ (p=0.074 n=9)
+32Sizes/32       10.80n ± 10%    10.12n ±  7%   -6.30% (p=0.011 n=9)
+32Sizes/64       19.31n ± 10%    17.23n ± 12%  -10.77% (p=0.006 n=9)
+32Sizes/128      37.02n ± 10%    34.64n ±  8%   -6.43% (p=0.011 n=9)
+32Sizes/256      72.01n ±  9%    74.52n ±  8%        ~ (p=0.436 n=9)
+32Sizes/512      145.9n ±  9%    137.5n ± 10%   -5.76% (p=0.014 n=9)
+32Sizes/1024     291.2n ±  7%    279.1n ± 11%        ~ (p=0.077 n=9)
+32Sizes/2048     569.6n ± 12%    558.6n ± 11%        ~ (p=0.161 n=9)
+32Sizes/4096     1.148µ ±  8%    1.117µ ± 10%        ~ (p=0.214 n=9)
+32Sizes/8192     2.227µ ± 10%    2.206µ ± 11%        ~ (p=0.297 n=9)
+64Sizes/32       7.591n ±  7%    7.907n ± 13%        ~ (p=0.077 n=9)
+64Sizes/64       10.68n ±  7%    11.72n ±  6%   +9.74% (p=0.001 n=9)
+64Sizes/128      17.20n ± 10%    19.96n ±  6%  +16.05% (p=0.000 n=9)
+64Sizes/256      31.86n ±  6%    36.51n ±  2%  +14.60% (p=0.000 n=9)
+64Sizes/512      60.02n ±  8%    68.54n ±  4%  +14.20% (p=0.000 n=9)
+64Sizes/1024     118.8n ±  7%    140.8n ±  2%  +18.52% (p=0.000 n=9)
+64Sizes/2048     242.1n ±  6%    263.4n ±  2%   +8.80% (p=0.000 n=9)
+64Sizes/4096     468.4n ±  8%    534.7n ±  2%  +14.15% (p=0.000 n=9)
+64Sizes/8192     945.7n ±  6%   1058.0n ±  2%  +11.87% (p=0.000 n=9)
+128Sizes/32      7.494n ±  9%    7.267n ±  4%        ~ (p=0.161 n=9)
+128Sizes/64      10.31n ± 10%    11.09n ±  5%   +7.57% (p=0.038 n=9)
+128Sizes/128     17.00n ±  9%    19.46n ±  4%  +14.47% (p=0.000 n=9)
+128Sizes/256     30.81n ±  6%    36.00n ±  7%  +16.85% (p=0.000 n=9)
+128Sizes/512     60.98n ±  4%    69.94n ±  5%  +14.69% (p=0.000 n=9)
+128Sizes/1024    117.2n ±  8%    140.9n ±  8%  +20.22% (p=0.000 n=9)
+128Sizes/2048    236.1n ±  8%    271.7n ±  4%  +15.08% (p=0.000 n=9)
+128Sizes/4096    467.7n ±  8%    547.3n ±  5%  +17.02% (p=0.000 n=9)
+128Sizes/8192    935.5n ±  5%   1065.0n ±  9%  +13.84% (p=0.000 n=9)
+geomean          23.29n          22.88n         -1.77%
+
+               │ rr_asm_c.txt  │             rr_new_c.txt              │
 ```
 
-64/128 bit sums, amd64:
+The pure Go code is faster than the assembly was for every 128 bit input
+under 64 bytes, in particular the 9 through 15 byte tails, and the 32 bit
+sums are faster at every size from 32 bytes up. The block loop for the 64 and
+128 bit sums remains 10 to 20 percent slower than the assembly on inputs of
+128 bytes and more. That is the slice bookkeeping the compiler emits per
+iteration; on this machine the two block unroll did not measurably reduce it,
+and against the old plain loop it is within noise below 512 bytes and a few
+percent behind above.
+
+Old pure Go (left, what every non-amd64 architecture ran) versus the current
+pure Go (right), 64 and 128 bit sums:
 
 ```
-64Sizes/32-12     2.34GB/s ± 5%  4.36GB/s ± 3%  +85.86%  (p=0.000 n=10+10)
-64Sizes/64-12     3.62GB/s ± 5%  6.27GB/s ± 3%  +73.37%  (p=0.000 n=10+9)
-64Sizes/128-12    5.12GB/s ± 3%  7.70GB/s ± 6%  +50.27%  (p=0.000 n=10+10)
-64Sizes/256-12    6.35GB/s ± 2%  8.61GB/s ± 3%  +35.50%  (p=0.000 n=10+10)
-64Sizes/512-12    6.58GB/s ± 7%  8.59GB/s ± 4%  +30.48%  (p=0.000 n=10+9)
-64Sizes/1024-12   7.49GB/s ± 3%  8.81GB/s ± 2%  +17.66%  (p=0.000 n=10+10)
-64Sizes/2048-12   8.06GB/s ± 2%  8.90GB/s ± 4%  +10.49%  (p=0.000 n=9+10)
-64Sizes/4096-12   8.27GB/s ± 6%  8.90GB/s ± 4%   +7.54%  (p=0.000 n=10+10)
-64Sizes/8192-12   8.35GB/s ± 4%  9.00GB/s ± 3%   +7.80%  (p=0.000 n=10+9)
-128Sizes/32-12    2.27GB/s ± 2%  4.29GB/s ± 9%  +88.75%  (p=0.000 n=10+10)
-128Sizes/64-12    3.55GB/s ± 2%  6.10GB/s ± 8%  +71.78%  (p=0.000 n=8+10)
-128Sizes/128-12   5.09GB/s ± 1%  7.62GB/s ± 9%  +49.63%  (p=0.000 n=9+10)
-128Sizes/256-12   6.33GB/s ± 3%  8.65GB/s ± 3%  +36.71%  (p=0.000 n=9+10)
-128Sizes/512-12   6.78GB/s ± 3%  8.39GB/s ± 6%  +23.77%  (p=0.000 n=9+10)
-128Sizes/1024-12  7.46GB/s ± 4%  8.70GB/s ± 4%  +16.70%  (p=0.000 n=9+10)
-128Sizes/2048-12  7.99GB/s ± 4%  8.73GB/s ± 8%   +9.26%  (p=0.003 n=9+10)
-128Sizes/4096-12  8.20GB/s ± 2%  8.86GB/s ± 6%   +8.00%  (p=0.000 n=10+10)
-128Sizes/8192-12  8.24GB/s ± 2%  9.01GB/s ± 3%   +9.30%  (p=0.000 n=8+10)
+               │ rr_gen_c.txt  │            rr_new_c.txt             │
+               │    sec/op     │    sec/op     vs base               │
+128Branches/0     3.326n ± 10%   3.813n ± 11%  +14.64% (p=0.000 n=9)
+128Branches/1     4.021n ±  9%   4.113n ± 10%        ~ (p=0.297 n=9)
+128Branches/2     4.402n ±  7%   4.192n ± 10%        ~ (p=0.161 n=9)
+128Branches/3     4.615n ± 11%   4.367n ± 10%        ~ (p=0.161 n=9)
+128Branches/4     4.815n ± 13%   4.012n ± 13%  -16.68% (p=0.000 n=9)
+128Branches/5     5.126n ± 11%   4.233n ± 10%  -17.42% (p=0.000 n=9)
+128Branches/6     5.350n ±  9%   4.293n ±  8%  -19.76% (p=0.000 n=9)
+128Branches/7     5.616n ±  9%   4.461n ± 10%  -20.57% (p=0.000 n=9)
+128Branches/8     5.540n ± 10%   4.098n ±  7%  -26.03% (p=0.000 n=9)
+128Branches/9     6.000n ± 10%   4.446n ±  5%  -25.90% (p=0.000 n=9)
+128Branches/10    6.456n ± 10%   4.223n ± 11%  -34.59% (p=0.000 n=9)
+128Branches/11    6.781n ± 11%   4.573n ±  7%  -32.56% (p=0.000 n=9)
+128Branches/12    7.290n ± 11%   4.249n ±  9%  -41.71% (p=0.000 n=9)
+128Branches/13    7.499n ± 14%   4.482n ±  9%  -40.23% (p=0.000 n=9)
+128Branches/14    8.063n ± 21%   4.473n ±  9%  -44.52% (p=0.000 n=9)
+128Branches/15    8.671n ± 11%   4.714n ±  8%  -45.63% (p=0.000 n=9)
+128Branches/16    5.731n ± 22%   5.388n ± 13%        ~ (p=0.474 n=9)
+64Sizes/32       11.040n ± 17%   7.907n ± 13%  -28.38% (p=0.000 n=9)
+64Sizes/64        15.77n ± 29%   11.72n ±  6%  -25.68% (p=0.000 n=9)
+64Sizes/128       25.79n ± 30%   19.96n ±  6%  -22.61% (p=0.001 n=9)
+64Sizes/256       40.22n ± 62%   36.51n ±  2%   -9.22% (p=0.002 n=9)
+64Sizes/512       73.45n ± 67%   68.54n ±  4%        ~ (p=0.489 n=9)
+64Sizes/1024      137.4n ± 62%   140.8n ±  2%        ~ (p=0.546 n=9)
+64Sizes/2048      268.9n ± 12%   263.4n ±  2%        ~ (p=0.154 n=9)
+64Sizes/4096      527.4n ±  9%   534.7n ±  2%        ~ (p=0.436 n=9)
+64Sizes/8192      1.010µ ±  5%   1.058µ ±  2%   +4.75% (p=0.047 n=9)
+128Sizes/32       7.759n ±  5%   7.267n ±  4%   -6.34% (p=0.004 n=9)
+128Sizes/64       11.43n ±  6%   11.09n ±  5%        ~ (p=0.094 n=9)
+128Sizes/128      19.61n ±  3%   19.46n ±  4%        ~ (p=0.605 n=9)
+128Sizes/256      34.55n ±  6%   36.00n ±  7%        ~ (p=0.136 n=9)
+128Sizes/512      64.97n ±  6%   69.94n ±  5%   +7.65% (p=0.006 n=9)
+128Sizes/1024     128.9n ±  5%   140.9n ±  8%   +9.31% (p=0.002 n=9)
+128Sizes/2048     254.1n ± 11%   271.7n ±  4%        ~ (p=0.113 n=9)
+128Sizes/4096     498.7n ± 13%   547.3n ±  5%   +9.75% (p=0.040 n=9)
+128Sizes/8192     1.002µ ± 10%   1.065µ ±  9%   +6.29% (p=0.029 n=9)
+geomean           26.41n         22.88n        -13.37%
+
+               │ rr_gen_c.txt  │             rr_new_c.txt              │
 ```
+

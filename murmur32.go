@@ -9,6 +9,7 @@ import (
 var (
 	_ hash.Hash   = new(digest32)
 	_ hash.Hash32 = new(digest32)
+	_ hash.Cloner = new(digest32)
 )
 
 const (
@@ -52,49 +53,33 @@ func (d *digest32) Sum(b []byte) []byte {
 // Digest as many blocks as possible.
 func (d *digest32) bmix(p []byte) (tail []byte) {
 	h1 := d.h1
-
 	for len(p) >= 4 {
-		k1 := uint32(p[0]) | uint32(p[1])<<8 | uint32(p[2])<<16 | uint32(p[3])<<24
+		h1 = mix32(h1, load32(p))
 		p = p[4:]
-
-		k1 *= c1_32
-		k1 = bits.RotateLeft32(k1, 15)
-		k1 *= c2_32
-
-		h1 ^= k1
-		h1 = bits.RotateLeft32(h1, 13)
-		h1 = h1*5 + 0xe6546b64
 	}
 	d.h1 = h1
 	return p
 }
 
 func (d *digest32) Sum32() (h1 uint32) {
+	return sum32(d.h1, d.tail, d.clen)
+}
 
-	h1 = d.h1
-	var k1 uint32
-	switch len(d.tail) & 3 {
-	case 3:
-		k1 ^= uint32(d.tail[2]) << 16
-		fallthrough
-	case 2:
-		k1 ^= uint32(d.tail[1]) << 8
-		fallthrough
-	case 1:
-		k1 ^= uint32(d.tail[0])
-		k1 *= c1_32
-		k1 = bits.RotateLeft32(k1, 15)
-		k1 *= c2_32
-		h1 ^= k1
-	}
+// Clone returns a copy of the hash. Writes to either copy do not affect the
+// other. The returned hash is a hash.Hash32.
+func (d *digest32) Clone() (hash.Cloner, error) {
+	c := *d
+	c.reseat(&c)
+	return &c, nil
+}
 
-	h1 ^= uint32(d.clen)
+// mix32 folds one 4 byte block into the running hash.
+func mix32(h1, k1 uint32) uint32 {
+	k1 *= c1_32
+	k1 = bits.RotateLeft32(k1, 15)
+	k1 *= c2_32
 
-	h1 ^= h1 >> 16
-	h1 *= 0x85ebca6b
-	h1 ^= h1 >> 13
-	h1 *= 0xc2b2ae35
-	h1 ^= h1 >> 16
-
-	return h1
+	h1 ^= k1
+	h1 = bits.RotateLeft32(h1, 13)
+	return h1*5 + 0xe6546b64
 }
