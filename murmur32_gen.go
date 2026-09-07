@@ -35,31 +35,47 @@ func SeedStringSum32(seed uint32, data string) (h1 uint32) {
 // the total number of bytes hashed. The one shot sums pass all of their
 // input; the streaming digest passes its leftover tail.
 func sum32[T bytestring](h1 uint32, data T, clen int) uint32 {
-	// Strictly greater for the same reason as in sum128: it removes the
-	// compiler's zero length pointer guard from the loop.
-	for len(data) > 4 {
-		h1 = mix32(h1, load32(data))
-		data = data[4:]
-	}
 	if len(data) >= 4 {
-		h1 = mix32(h1, load32(data))
-		data = data[4:]
-	}
+		// See sum128: the last four bytes are in bounds, so shift the tail
+		// out of them before the loop rather than branch on its length
+		// after it.
+		n := len(data) & 3
+		var k1 uint32
+		if n != 0 {
+			end := data[len(data)-4:]
+			k1 = load32(end[:4]) >> (8 * uint(4-n))
+		}
+		for len(data) > 4 {
+			h1 = mix32(h1, load32(data))
+			data = data[4:]
+		}
+		if len(data) >= 4 {
+			h1 = mix32(h1, load32(data))
+		}
 
-	var k1 uint32
-	switch len(data) {
-	case 3:
-		k1 ^= uint32(data[2]) << 16
-		fallthrough
-	case 2:
-		k1 ^= uint32(data[1]) << 8
-		fallthrough
-	case 1:
-		k1 ^= uint32(data[0])
-		k1 *= c1_32
-		k1 = bits.RotateLeft32(k1, 15)
-		k1 *= c2_32
-		h1 ^= k1
+		if n != 0 {
+			k1 *= c1_32
+			k1 = bits.RotateLeft32(k1, 15)
+			k1 *= c2_32
+			h1 ^= k1
+		}
+	} else {
+		var k1 uint32
+		switch len(data) {
+		case 3:
+			k1 ^= uint32(data[2]) << 16
+			fallthrough
+		case 2:
+			k1 ^= uint32(data[1]) << 8
+			fallthrough
+		case 1:
+			k1 ^= uint32(data[0])
+			k1 *= c1_32
+			k1 = bits.RotateLeft32(k1, 15)
+			k1 *= c2_32
+			h1 ^= k1
+		}
+
 	}
 
 	h1 ^= uint32(clen)

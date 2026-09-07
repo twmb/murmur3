@@ -53,7 +53,7 @@ func (d *digest64) Clone() (hash.Cloner, error) {
 //	hasher.Write(data)
 //	return hasher.Sum64()
 func Sum64(data []byte) uint64 {
-	h1, _ := Sum128(data)
+	h1, _ := sum128(0, 0, data, len(data))
 	return h1
 }
 
@@ -63,18 +63,18 @@ func Sum64(data []byte) uint64 {
 // Because the canonical implementation does not support SeedSum64, this uses
 // SeedSum128(seed, seed, data).
 func SeedSum64(seed uint64, data []byte) uint64 {
-	h1, _ := SeedSum128(seed, seed, data)
+	h1, _ := sum128(seed, seed, data, len(data))
 	return h1
 }
 
 // StringSum64 is the string version of Sum64.
 func StringSum64(data string) uint64 {
-	h1, _ := StringSum128(data)
+	h1, _ := sum128(0, 0, data, len(data))
 	return h1
 }
 
 // SeedStringSum64 is the string version of SeedSum64.
 func SeedStringSum64(seed uint64, data string) uint64 {
-	h1, _ := SeedStringSum128(seed, seed, data)
+	h1, _ := sum128(seed, seed, data, len(data))
 	return h1
 }

@@ -454,6 +454,32 @@ func Benchmark128Sizes(b *testing.B) {
 	}
 }
 
+// Fixed length benchmarks let the branch predictor learn every branch in
+// the tail. Real key streams do not, so these draw a fresh length in [0, 64)
+// from xorshift on every call; the generator itself is a few cycles.
+
+func BenchmarkRandomLengths32(b *testing.B) {
+	buf := make([]byte, 64)
+	x := uint64(88172645463325252)
+	for b.Loop() {
+		x ^= x << 13
+		x ^= x >> 7
+		x ^= x << 17
+		Sum32(buf[:x&63])
+	}
+}
+
+func BenchmarkRandomLengths128(b *testing.B) {
+	buf := make([]byte, 64)
+	x := uint64(88172645463325252)
+	for b.Loop() {
+		x ^= x << 13
+		x ^= x >> 7
+		x ^= x << 17
+		Sum128(buf[:x&63])
+	}
+}
+
 func BenchmarkNoescape32(b *testing.B) {
 	for b.Loop() {
 		var buf [8192]byte

@@ -38,74 +38,103 @@ func SeedStringSum128(seed1, seed2 uint64, data string) (h1 uint64, h2 uint64) {
 // with clen, the total number of bytes hashed. The one shot sums pass all
 // of their input; the streaming digest passes its leftover tail.
 func sum128[T bytestring](h1, h2 uint64, data T, clen int) (uint64, uint64) {
-	// The bound is strictly greater so the reslice can never leave zero
-	// bytes, which lets the compiler drop the pointer guard it otherwise
-	// emits for that case; the block that can be left over is taken below.
-	// Unrolling does not pay once the guard is gone: the loop is bound by
-	// the multiply port and the h1 to h2 chain, not by instruction count.
-	for len(data) > 16 {
-		h1, h2 = mix128(h1, h2, load64(data), load64(data[8:]))
-		data = data[16:]
-	}
 	if len(data) >= 16 {
-		h1, h2 = mix128(h1, h2, load64(data), load64(data[8:]))
-		data = data[16:]
-	}
+		// With at least one full block, the last 16 bytes of the input are
+		// always in bounds, and the tail is whatever of them the block loop
+		// will not consume. Read it out of them here with two overlapping
+		// loads instead of branching on its length afterwards: a switch on
+		// the length is a jump table, and on varying key lengths it
+		// mispredicts nearly every time. Doing it before the loop also
+		// leaves only two words live across the loop and hides the loads
+		// behind it. k1 is the first eight tail bytes, loaded exactly when
+		// n >= 8 and otherwise shifted down out of the last eight bytes;
+		// k2 is whatever sits above those. A shift of 64 or more is zero
+		// in Go, so k2 is zero for a tail of eight bytes or fewer, and
+		// mixing zero changes nothing, so the mixes need no guard of
+		// their own.
+		n := len(data) & 15
+		var k1, k2 uint64
+		if n != 0 {
+			end := data[len(data)-16:]
+			m := max(n, 8)
+			k1 = load64(end[16-m:24-m]) >> (8 * uint(8-min(n, 8)))
+			k2 = load64(end[8:]) >> (8 * uint(16-n))
+		}
+		for len(data) > 16 {
+			h1, h2 = mix128(h1, h2, load64(data), load64(data[8:]))
+			data = data[16:]
+		}
+		if len(data) >= 16 {
+			h1, h2 = mix128(h1, h2, load64(data), load64(data[8:]))
+		}
 
-	// Every case knows its exact length, so the compiler proves all bounds
-	// and each case is two or three word sized loads. This is faster than
-	// the canonical byte at a time fallthrough switch.
-	var k1, k2 uint64
-	switch len(data) {
-	case 15:
-		k2 = uint64(load32(data[8:])) | uint64(load16(data[12:]))<<32 | uint64(data[14])<<48
-		k1 = load64(data)
-	case 14:
-		k2 = uint64(load32(data[8:])) | uint64(load16(data[12:]))<<32
-		k1 = load64(data)
-	case 13:
-		k2 = uint64(load32(data[8:])) | uint64(data[12])<<32
-		k1 = load64(data)
-	case 12:
-		k2 = uint64(load32(data[8:]))
-		k1 = load64(data)
-	case 11:
-		k2 = uint64(load16(data[8:])) | uint64(data[10])<<16
-		k1 = load64(data)
-	case 10:
-		k2 = uint64(load16(data[8:]))
-		k1 = load64(data)
-	case 9:
-		k2 = uint64(data[8])
-		k1 = load64(data)
-	case 8:
-		k1 = load64(data)
-	case 7:
-		k1 = uint64(load32(data)) | uint64(load16(data[4:]))<<32 | uint64(data[6])<<48
-	case 6:
-		k1 = uint64(load32(data)) | uint64(load16(data[4:]))<<32
-	case 5:
-		k1 = uint64(load32(data)) | uint64(data[4])<<32
-	case 4:
-		k1 = uint64(load32(data))
-	case 3:
-		k1 = uint64(load16(data)) | uint64(data[2])<<16
-	case 2:
-		k1 = uint64(load16(data))
-	case 1:
-		k1 = uint64(data[0])
-	}
-	if len(data) > 8 {
-		k2 *= c2_128
-		k2 = bits.RotateLeft64(k2, 33)
-		k2 *= c1_128
-		h2 ^= k2
-	}
-	if len(data) > 0 {
-		k1 *= c1_128
-		k1 = bits.RotateLeft64(k1, 31)
-		k1 *= c2_128
-		h1 ^= k1
+		if n != 0 {
+			k2 *= c2_128
+			k2 = bits.RotateLeft64(k2, 33)
+			k2 *= c1_128
+			h2 ^= k2
+			k1 *= c1_128
+			k1 = bits.RotateLeft64(k1, 31)
+			k1 *= c2_128
+			h1 ^= k1
+		}
+	} else {
+		// Every case knows its exact length, so the compiler proves all bounds
+		// and each case is two or three word sized loads. This is faster than
+		// the canonical byte at a time fallthrough switch.
+		var k1, k2 uint64
+		switch len(data) {
+		case 15:
+			k2 = uint64(load32(data[8:])) | uint64(load16(data[12:]))<<32 | uint64(data[14])<<48
+			k1 = load64(data)
+		case 14:
+			k2 = uint64(load32(data[8:])) | uint64(load16(data[12:]))<<32
+			k1 = load64(data)
+		case 13:
+			k2 = uint64(load32(data[8:])) | uint64(data[12])<<32
+			k1 = load64(data)
+		case 12:
+			k2 = uint64(load32(data[8:]))
+			k1 = load64(data)
+		case 11:
+			k2 = uint64(load16(data[8:])) | uint64(data[10])<<16
+			k1 = load64(data)
+		case 10:
+			k2 = uint64(load16(data[8:]))
+			k1 = load64(data)
+		case 9:
+			k2 = uint64(data[8])
+			k1 = load64(data)
+		case 8:
+			k1 = load64(data)
+		case 7:
+			k1 = uint64(load32(data)) | uint64(load16(data[4:]))<<32 | uint64(data[6])<<48
+		case 6:
+			k1 = uint64(load32(data)) | uint64(load16(data[4:]))<<32
+		case 5:
+			k1 = uint64(load32(data)) | uint64(data[4])<<32
+		case 4:
+			k1 = uint64(load32(data))
+		case 3:
+			k1 = uint64(load16(data)) | uint64(data[2])<<16
+		case 2:
+			k1 = uint64(load16(data))
+		case 1:
+			k1 = uint64(data[0])
+		}
+		if len(data) > 8 {
+			k2 *= c2_128
+			k2 = bits.RotateLeft64(k2, 33)
+			k2 *= c1_128
+			h2 ^= k2
+		}
+		if len(data) > 0 {
+			k1 *= c1_128
+			k1 = bits.RotateLeft64(k1, 31)
+			k1 *= c2_128
+			h1 ^= k1
+		}
+
 	}
 
 	h1 ^= uint64(clen)
