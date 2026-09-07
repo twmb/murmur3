@@ -85,23 +85,29 @@ benchmark            asm  old Go  new Go   new/asm new/old
 ```
 
 Per 16 byte block that is 8.2 cycles for the assembly and 8.5 for the Go
-loop. The loop is bound by latency and by port pressure, not by instruction
-count: the four 64 bit multiplies per block and the LEAs share one execution
-port, and the loop carried h1 to h2 chain runs through those same
-instructions. The one change that helped was the strictly greater loop bound,
-which removes the zero length pointer guard the compiler emits after every
-reslice, four instructions per block, without touching the arithmetic.
-Everything else was measured and lost: unrolling two or four blocks per
-iteration, hoisting the constants into registers, and folding the two adds
-by hand all cut instructions and cost cycles, because the compiler's own
-folding of 5*c1 + c2 is what keeps the chain short, and because which
-registers the allocator hands out decides whether a three address add
-becomes an LEA on the contended port. Byte identical loops landed anywhere
-from 8.5 to 11 cycles per block on that alone. That also makes the result a
-property of the compiler version: Go 1.26 and 1.27 both produce the 8.5
-cycle loop from this source, while Go 1.25 emits four more instructions for
-it and lands at 9.5, slower than the two block unroll it replaced.
+loop, and perf's port counters say where the difference is. The Go loop
+issues 29 micro ops per block to the assembly's 19, so on a four wide core its
+floor is 7.3 cycles and ports 0, 1 and 6 each run 75 to 80 percent busy; the
+measured 8.5 is scheduling slack on top of that. The assembly has slack on
+every port and sits on its dependency chain instead: the four 64 bit
+multiplies and the rotates are off that chain, and what is left is h1 to h2
+through two three operand LEAs at three cycles each.
+
+The one change that helped was the strictly greater loop bound, which
+removes the zero length pointer guard the compiler emits after every reslice,
+four micro ops per block, without touching the arithmetic. Everything else
+was measured and lost: unrolling two or four blocks per iteration, hoisting
+the constants into registers, folding the two adds by hand, and moving the
+loop into its own function. Cutting micro ops only wins if the h1 to h2 chain
+stays at the five cycles the compiler's own folding of 5*c1 + c2 gives it, and
+which registers the allocator hands out decides whether a three address add
+is an ADD or an LEA. Byte identical loops landed anywhere from 8.5 to 11
+cycles per block on that alone. That also makes the result a property of the
+compiler version: Go 1.26 and 1.27 both produce the 8.5 cycle loop from this
+source, while Go 1.25 emits four more instructions for it and lands at 9.5,
+slower than the two block unroll it replaced. GOAMD64=v3 changes nothing.
 
 The 32 bit sum is bound by its own four cycle per block dependency chain and
-sits at about 4.8; nothing above the algorithm changes that. The strict bound
+sits at 4.8 with every port under 80 percent busy; nothing above the
+algorithm changes that. The strict bound
 is what it gains at 32 to 64 bytes.
