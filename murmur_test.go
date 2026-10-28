@@ -47,6 +47,9 @@ func TestRef(t *testing.T) {
 		if p := fmt.Sprintf("%x", h32_byte.Sum(nil)); p != target {
 			t.Errorf("'%s': %s (want %s)", elem.s, p, target)
 		}
+		if n := h32_byte.Size(); n != 4 {
+			t.Errorf("New32: Size %d (want 4)", n)
+		}
 
 		if v := Sum32([]byte(elem.s)); v != elem.h32 {
 			t.Errorf("'%s': 0x%x (want 0x%x)", elem.s, v, elem.h32)
@@ -64,6 +67,9 @@ func TestRef(t *testing.T) {
 		if p := fmt.Sprintf("%x", h64_byte.Sum(nil)); p != target {
 			t.Errorf("Sum64: '%s': %s (want %s)", elem.s, p, target)
 		}
+		if n := h64_byte.Size(); n != 8 {
+			t.Errorf("New64: Size %d (want 8)", n)
+		}
 
 		if v := Sum64([]byte(elem.s)); v != elem.h64_1 {
 			t.Errorf("Sum64: '%s': 0x%x (want 0x%x)", elem.s, v, elem.h64_1)
@@ -80,6 +86,9 @@ func TestRef(t *testing.T) {
 		target = fmt.Sprintf("%016x%016x", elem.h64_1, elem.h64_2)
 		if p := fmt.Sprintf("%x", h128_byte.Sum(nil)); p != target {
 			t.Errorf("New128: '%s': %s (want %s)", elem.s, p, target)
+		}
+		if n := h128_byte.Size(); n != 16 {
+			t.Errorf("New128: Size %d (want 16)", n)
 		}
 
 		if v1, v2 := Sum128([]byte(elem.s)); v1 != elem.h64_1 || v2 != elem.h64_2 {
@@ -352,6 +361,7 @@ func TestClone(t *testing.T) {
 func TestIncremental(t *testing.T) {
 	for _, elem := range data {
 		h32 := New32()
+		h64 := New64()
 		h128 := New128()
 		for i, j, k := 0, 0, len(elem.s); i < k; i = j {
 			j = 2*i + 3
@@ -360,10 +370,14 @@ func TestIncremental(t *testing.T) {
 			}
 			s := elem.s[i:j]
 			h32.Write([]byte(s))
+			h64.Write([]byte(s))
 			h128.Write([]byte(s))
 		}
 		if v := h32.Sum32(); v != elem.h32 {
 			t.Errorf("'%s': 0x%x (want 0x%x)", elem.s, v, elem.h32)
+		}
+		if v := h64.Sum64(); v != elem.h64_1 {
+			t.Errorf("New64: '%s': 0x%x (want 0x%x)", elem.s, v, elem.h64_1)
 		}
 		if v1, v2 := h128.Sum128(); v1 != elem.h64_1 || v2 != elem.h64_2 {
 			t.Errorf("'%s': 0x%x-0x%x (want 0x%x-0x%x)", elem.s, v1, v2, elem.h64_1, elem.h64_2)

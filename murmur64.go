@@ -26,6 +26,9 @@ func New64() hash.Hash64 {
 	return SeedNew64(0)
 }
 
+// Size returns 8, the length of Sum; Write mixes 16 byte blocks.
+func (d *digest64) Size() int { return 8 }
+
 func (d *digest64) Sum(b []byte) []byte {
 	h1 := d.Sum64()
 	return append(b,
