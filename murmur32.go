@@ -31,10 +31,7 @@ type digest32 struct {
 // This reads and processes the data in chunks of little endian uint32s;
 // thus, the returned hash is portable across architectures.
 func SeedNew32(seed uint32) hash.Hash32 {
-	d := &digest32{seed: seed}
-	d.bmixer = d
-	d.Reset()
-	return d
+	return &digest32{seed: seed, h1: seed}
 }
 
 // New32 returns a hash.Hash32 for streaming 32 bit sums.
@@ -44,7 +41,28 @@ func New32() hash.Hash32 {
 
 func (d *digest32) Size() int { return 4 }
 
-func (d *digest32) reset() { d.h1 = d.seed }
+func (d *digest32) Reset() { d.clen, d.ntail, d.h1 = 0, 0, d.seed }
+
+func (d *digest32) Write(p []byte) (n int, err error) {
+	n = len(p)
+	d.clen += n
+
+	if d.ntail > 0 {
+		// Stick back pending bytes.
+		m := copy(d.buf[d.ntail:4], p)
+		d.ntail += m
+		if d.ntail < 4 {
+			return n, nil
+		}
+		// One full block was formed.
+		p = p[m:]
+		_ = d.bmix(d.buf[:4]) // No tail.
+	}
+
+	// Keep own copy of the 0 to Size()-1 pending bytes.
+	d.ntail = copy(d.buf[:], d.bmix(p))
+	return n, nil
+}
 
 func (d *digest32) Sum(b []byte) []byte {
 	h := d.Sum32()
@@ -63,14 +81,13 @@ func (d *digest32) bmix(p []byte) (tail []byte) {
 }
 
 func (d *digest32) Sum32() (h1 uint32) {
-	return sum32(d.h1, unsafe.String(unsafe.SliceData(d.tail), len(d.tail)), d.clen)
+	return sum32(d.h1, unsafe.String(&d.buf[0], d.ntail), d.clen)
 }
 
 // Clone returns a copy of the hash. Writes to either copy do not affect the
 // other. The returned hash is a hash.Hash32.
 func (d *digest32) Clone() (hash.Cloner, error) {
 	c := *d
-	c.reseat(&c)
 	return &c, nil
 }
 

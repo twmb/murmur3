@@ -10,7 +10,6 @@ var (
 	_ hash.Hash   = new(digest64)
 	_ hash.Hash64 = new(digest64)
 	_ hash.Cloner = new(digest64)
-	_ bmixer      = new(digest64)
 )
 
 // digest64 is half a digest128.
@@ -30,6 +29,10 @@ func New64() hash.Hash64 {
 // Size returns 8, the length of Sum; Write mixes 16 byte blocks.
 func (d *digest64) Size() int { return 8 }
 
+func (d *digest64) Reset() { (*digest128)(d).Reset() }
+
+func (d *digest64) Write(p []byte) (int, error) { return (*digest128)(d).Write(p) }
+
 func (d *digest64) Sum(b []byte) []byte {
 	h1 := d.Sum64()
 	return append(b,
@@ -46,7 +49,6 @@ func (d *digest64) Sum64() uint64 {
 // other. The returned hash is a hash.Hash64.
 func (d *digest64) Clone() (hash.Cloner, error) {
 	c := *d
-	c.reseat((*digest128)(&c))
 	return &c, nil
 }
 

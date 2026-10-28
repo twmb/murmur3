@@ -386,8 +386,9 @@ func TestIncremental(t *testing.T) {
 	}
 }
 
-// TestNoescape checks that the one shot sums leave your input on the stack.
-// Only a caller in another package sees the allocations, so this file is
+// TestNoescape checks that the sums leave your input on the stack, and that
+// a hasher you create and use in one function stays on the stack. Only a
+// caller in another package sees the sums' allocations, so this file is
 // package murmur3_test.
 func TestNoescape(t *testing.T) {
 	// Each func declares its own buf: a buf captured from outside would
@@ -409,6 +410,11 @@ func TestNoescape(t *testing.T) {
 		{"SeedSum128", func(n int) { var b [32]byte; SeedSum128(1, 2, b[:n]) }},
 		{"StringSum128", func(n int) { var b [32]byte; StringSum128(string(b[:n])) }},
 		{"SeedStringSum128", func(n int) { var b [32]byte; SeedStringSum128(1, 2, string(b[:n])) }},
+
+		// Two writes, so the second joins the first one's pending bytes.
+		{"New32", func(n int) { var b [32]byte; h := New32(); h.Write(b[:n]); h.Write(b[:n]); h.Sum32() }},
+		{"New64", func(n int) { var b [32]byte; h := New64(); h.Write(b[:n]); h.Write(b[:n]); h.Sum64() }},
+		{"New128", func(n int) { var b [32]byte; h := New128(); h.Write(b[:n]); h.Write(b[:n]); h.Sum128() }},
 	} {
 		for _, n := range []int{0, 3, 4, 15, 16, 17, 32} {
 			if allocs := testing.AllocsPerRun(10, func() { test.fn(n) }); allocs != 0 {
@@ -438,7 +444,7 @@ func BenchmarkPartial32Branches(b *testing.B) {
 		b.Run(strconv.Itoa(length), func(b *testing.B) {
 			buf := make([]byte, length)
 			b.SetBytes(int64(length))
-			for b.Loop() {
+			for range b.N {
 				hasher := New32()
 				hasher.Write(buf)
 				hasher.Sum32()

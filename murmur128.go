@@ -16,7 +16,6 @@ var (
 	_ hash.Hash   = new(digest128)
 	_ hash.Cloner = new(digest128)
 	_ Hash128     = new(digest128)
-	_ bmixer      = new(digest128)
 )
 
 // Hash128 provides an interface for a streaming 128 bit hash.
@@ -40,10 +39,7 @@ type digest128 struct {
 // The canonical implementation allows one only uint32 seed; to imitate that
 // behavior, use the same, uint32-max seed for seed1 and seed2.
 func SeedNew128(seed1, seed2 uint64) Hash128 {
-	d := &digest128{seed1: seed1, seed2: seed2}
-	d.bmixer = d
-	d.Reset()
-	return d
+	return &digest128{seed1: seed1, seed2: seed2, h1: seed1, h2: seed2}
 }
 
 // New128 returns a Hash128 for streaming 128 bit sums.
@@ -53,7 +49,28 @@ func New128() Hash128 {
 
 func (d *digest128) Size() int { return 16 }
 
-func (d *digest128) reset() { d.h1, d.h2 = d.seed1, d.seed2 }
+func (d *digest128) Reset() { d.clen, d.ntail, d.h1, d.h2 = 0, 0, d.seed1, d.seed2 }
+
+func (d *digest128) Write(p []byte) (n int, err error) {
+	n = len(p)
+	d.clen += n
+
+	if d.ntail > 0 {
+		// Stick back pending bytes.
+		m := copy(d.buf[d.ntail:16], p)
+		d.ntail += m
+		if d.ntail < 16 {
+			return n, nil
+		}
+		// One full block was formed.
+		p = p[m:]
+		_ = d.bmix(d.buf[:16]) // No tail.
+	}
+
+	// Keep own copy of the 0 to Size()-1 pending bytes.
+	d.ntail = copy(d.buf[:], d.bmix(p))
+	return n, nil
+}
 
 func (d *digest128) Sum(b []byte) []byte {
 	h1, h2 := d.Sum128()
@@ -85,14 +102,13 @@ func (d *digest128) bmix(p []byte) (tail []byte) {
 }
 
 func (d *digest128) Sum128() (h1, h2 uint64) {
-	return sum128(d.h1, d.h2, unsafe.String(unsafe.SliceData(d.tail), len(d.tail)), d.clen)
+	return sum128(d.h1, d.h2, unsafe.String(&d.buf[0], d.ntail), d.clen)
 }
 
 // Clone returns a copy of the hash. Writes to either copy do not affect the
 // other. The returned hash is a Hash128.
 func (d *digest128) Clone() (hash.Cloner, error) {
 	c := *d
-	c.reseat(&c)
 	return &c, nil
 }
 

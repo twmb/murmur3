@@ -41,57 +41,13 @@ func load16[T bytestring](b T) uint32 {
 	return uint32(b[0]) | uint32(b[1])<<8
 }
 
-type bmixer interface {
-	bmix(p []byte) (tail []byte)
-	Size() (n int)
-	reset()
-}
-
+// NOTE: digest holds no pointer into itself. The compiler moves a hasher
+// that points to itself, or that keeps a slice of its own buf, to the heap,
+// even when you create and use the hasher in one function.
 type digest struct {
-	clen int      // Digested input cumulative length.
-	tail []byte   // 0 to Size()-1 bytes view of `buf'.
-	buf  [16]byte // Expected (but not required) to be Size() large.
-	bmixer
+	clen  int      // Digested input cumulative length.
+	ntail int      // Pending bytes at the front of buf, less than one block.
+	buf   [16]byte // One digest128 block; digest32 uses the first 4 bytes.
 }
 
 func (d *digest) BlockSize() int { return 1 }
-
-func (d *digest) Write(p []byte) (n int, err error) {
-	n = len(p)
-	d.clen += n
-
-	if len(d.tail) > 0 {
-		// Stick back pending bytes.
-		nfree := d.Size() - len(d.tail) // nfree ∈ [1, d.Size()-1].
-		if nfree < len(p) {
-			// One full block can be formed.
-			block := append(d.tail, p[:nfree]...)
-			p = p[nfree:]
-			_ = d.bmix(block) // No tail.
-		} else {
-			// Tail's buf is large enough to prevent reallocs.
-			p = append(d.tail, p...)
-		}
-	}
-
-	d.tail = d.bmix(p)
-
-	// Keep own copy of the 0 to Size()-1 pending bytes.
-	nn := copy(d.buf[:], d.tail)
-	d.tail = d.buf[:nn]
-
-	return n, nil
-}
-
-func (d *digest) Reset() {
-	d.clen = 0
-	d.tail = nil
-	d.bmixer.reset()
-}
-
-// reseat fixes the self references after a struct copy: bmixer must point at
-// the copy, and tail must alias the copy's buf rather than the original's.
-func (d *digest) reseat(m bmixer) {
-	d.bmixer = m
-	d.tail = d.buf[:len(d.tail)]
-}
