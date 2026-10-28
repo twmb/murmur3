@@ -2,6 +2,7 @@ package murmur3
 
 import (
 	"hash"
+	"unsafe"
 )
 
 // Make sure interfaces are correctly implemented.
@@ -56,7 +57,7 @@ func (d *digest64) Clone() (hash.Cloner, error) {
 //	hasher.Write(data)
 //	return hasher.Sum64()
 func Sum64(data []byte) uint64 {
-	h1, _ := sum128(0, 0, data, len(data))
+	h1, _ := sum128(0, 0, unsafe.String(unsafe.SliceData(data), len(data)), len(data))
 	return h1
 }
 
@@ -66,7 +67,7 @@ func Sum64(data []byte) uint64 {
 // Because the canonical implementation does not support SeedSum64, this uses
 // SeedSum128(seed, seed, data).
 func SeedSum64(seed uint64, data []byte) uint64 {
-	h1, _ := sum128(seed, seed, data, len(data))
+	h1, _ := sum128(seed, seed, unsafe.String(unsafe.SliceData(data), len(data)), len(data))
 	return h1
 }
 

@@ -1,4 +1,4 @@
-package murmur3
+package murmur3_test
 
 import (
 	"crypto/rand"
@@ -11,6 +11,7 @@ import (
 	"testing/quick"
 	"unsafe"
 
+	. "github.com/twmb/murmur3"
 	"github.com/twmb/murmur3/testdata"
 )
 
@@ -385,6 +386,38 @@ func TestIncremental(t *testing.T) {
 	}
 }
 
+// TestNoescape checks that the one shot sums leave your input on the stack.
+// Only a caller in another package sees the allocations, so this file is
+// package murmur3_test.
+func TestNoescape(t *testing.T) {
+	// Each func declares its own buf: a buf captured from outside would
+	// move to the heap once, before AllocsPerRun counts. A string converted
+	// from more than 32 bytes allocates regardless, so b stays at 32.
+	for _, test := range []struct {
+		name string
+		fn   func(n int)
+	}{
+		{"Sum32", func(n int) { var b [32]byte; Sum32(b[:n]) }},
+		{"SeedSum32", func(n int) { var b [32]byte; SeedSum32(1, b[:n]) }},
+		{"StringSum32", func(n int) { var b [32]byte; StringSum32(string(b[:n])) }},
+		{"SeedStringSum32", func(n int) { var b [32]byte; SeedStringSum32(1, string(b[:n])) }},
+		{"Sum64", func(n int) { var b [32]byte; Sum64(b[:n]) }},
+		{"SeedSum64", func(n int) { var b [32]byte; SeedSum64(1, b[:n]) }},
+		{"StringSum64", func(n int) { var b [32]byte; StringSum64(string(b[:n])) }},
+		{"SeedStringSum64", func(n int) { var b [32]byte; SeedStringSum64(1, string(b[:n])) }},
+		{"Sum128", func(n int) { var b [32]byte; Sum128(b[:n]) }},
+		{"SeedSum128", func(n int) { var b [32]byte; SeedSum128(1, 2, b[:n]) }},
+		{"StringSum128", func(n int) { var b [32]byte; StringSum128(string(b[:n])) }},
+		{"SeedStringSum128", func(n int) { var b [32]byte; SeedStringSum128(1, 2, string(b[:n])) }},
+	} {
+		for _, n := range []int{0, 3, 4, 15, 16, 17, 32} {
+			if allocs := testing.AllocsPerRun(10, func() { test.fn(n) }); allocs != 0 {
+				t.Errorf("%s, %d bytes: got %v allocs per run, want 0", test.name, n, allocs)
+			}
+		}
+	}
+}
+
 // Our lengths force 1) the function base itself (no loop/tail), 2) remainders
 // and 3) the loop itself.
 
@@ -491,19 +524,5 @@ func BenchmarkRandomLengths128(b *testing.B) {
 		x ^= x >> 7
 		x ^= x << 17
 		Sum128(buf[:x&63])
-	}
-}
-
-func BenchmarkNoescape32(b *testing.B) {
-	for b.Loop() {
-		var buf [8192]byte
-		Sum32(buf[:])
-	}
-}
-
-func BenchmarkNoescape128(b *testing.B) {
-	for b.Loop() {
-		var buf [8192]byte
-		Sum128(buf[:])
 	}
 }

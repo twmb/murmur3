@@ -3,6 +3,7 @@ package murmur3
 import (
 	"hash"
 	"math/bits"
+	"unsafe"
 )
 
 const (
@@ -84,7 +85,7 @@ func (d *digest128) bmix(p []byte) (tail []byte) {
 }
 
 func (d *digest128) Sum128() (h1, h2 uint64) {
-	return sum128(d.h1, d.h2, d.tail, d.clen)
+	return sum128(d.h1, d.h2, unsafe.String(unsafe.SliceData(d.tail), len(d.tail)), d.clen)
 }
 
 // Clone returns a copy of the hash. Writes to either copy do not affect the
@@ -102,7 +103,7 @@ func (d *digest128) Clone() (hash.Cloner, error) {
 //	hasher.Write(data)
 //	return hasher.Sum128()
 func Sum128(data []byte) (h1 uint64, h2 uint64) {
-	return sum128(0, 0, data, len(data))
+	return sum128(0, 0, unsafe.String(unsafe.SliceData(data), len(data)), len(data))
 }
 
 // SeedSum128 returns the murmur3 sum of data with digests initialized to seed1
@@ -114,7 +115,7 @@ func Sum128(data []byte) (h1 uint64, h2 uint64) {
 // This reads and processes the data in chunks of little endian uint64s;
 // thus, the returned hashes are portable across architectures.
 func SeedSum128(seed1, seed2 uint64, data []byte) (h1 uint64, h2 uint64) {
-	return sum128(seed1, seed2, data, len(data))
+	return sum128(seed1, seed2, unsafe.String(unsafe.SliceData(data), len(data)), len(data))
 }
 
 // StringSum128 is the string version of Sum128.
@@ -130,7 +131,7 @@ func SeedStringSum128(seed1, seed2 uint64, data string) (h1 uint64, h2 uint64) {
 // sum128 mixes all of data into the running h1 and h2 and then finalizes
 // with clen, the total number of bytes hashed. The one shot sums pass all
 // of their input; the streaming digest passes its leftover tail.
-func sum128[T bytestring](h1, h2 uint64, data T, clen int) (uint64, uint64) {
+func sum128(h1, h2 uint64, data string, clen int) (uint64, uint64) {
 	if len(data) >= 16 {
 		// With a full block present, the last 16 bytes are always in
 		// bounds and the tail is whatever of them the loop will not

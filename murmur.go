@@ -10,9 +10,18 @@
 // machines.
 package murmur3
 
-// bytestring is what the one shot sums are generic over. The compiler
-// stencils one copy per type, so strings are hashed directly with no
-// conversion and no allocation.
+// NOTE: sum32 and sum128 take a string rather than being generic. The
+// compiler inlines an exported sum into a caller in another package, and the
+// caller then calls sum32 or sum128 directly. When sum32 and sum128 were
+// generic, the compiler moved a caller's input to the heap (issue #15). The
+// []byte sums call unsafe.String themselves rather than through a helper,
+// because a helper call puts Sum128 and SeedSum128 over the compiler's inline
+// budget, and the compiler then emits a call for each Sum128 and SeedSum128.
+// The sums only read the string from unsafe.String, and the string does not
+// outlive the sum.
+
+// bytestring lets one set of loads read both the streaming digests' []byte
+// blocks and the one shot sums' string input.
 type bytestring interface{ string | []byte }
 
 // The compiler turns the shift and or chains below into a single unaligned
