@@ -16,7 +16,7 @@ var (
 type digest64 digest128
 
 // SeedNew64 returns a hash.Hash64 for streaming 64 bit sums. As the canonical
-// implementation does not support Sum64, this uses SeedNew128(seed, seed)
+// implementation does not support Sum64, this uses SeedNew128(seed, seed).
 func SeedNew64(seed uint64) hash.Hash64 {
 	return (*digest64)(SeedNew128(seed, seed).(*digest128))
 }

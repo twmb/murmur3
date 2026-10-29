@@ -66,7 +66,7 @@ func TestRef(t *testing.T) {
 		h64_byte.Write([]byte(elem.s))
 		target = fmt.Sprintf("%016x", elem.h64_1)
 		if p := fmt.Sprintf("%x", h64_byte.Sum(nil)); p != target {
-			t.Errorf("Sum64: '%s': %s (want %s)", elem.s, p, target)
+			t.Errorf("New64: '%s': %s (want %s)", elem.s, p, target)
 		}
 		if n := h64_byte.Size(); n != 8 {
 			t.Errorf("New64: Size %d (want 8)", n)
@@ -248,9 +248,9 @@ func TestUnaligned(t *testing.T) {
 	}
 }
 
-// TestBoundaries forces every block/tail path to be exercised for Sum32 and
-// Sum128: the block loop, the single trailing block, and every tail length,
-// across several loop iterations.
+// TestBoundaries forces every block/tail path to be exercised for Sum32,
+// Sum64, and Sum128: the block loop, the single trailing block, and every
+// tail length, across several loop iterations.
 func TestBoundaries(t *testing.T) {
 	const maxCheck = 100
 	var data [maxCheck]byte

@@ -18,7 +18,7 @@ const (
 	c2_32 uint32 = 0x1b873593
 )
 
-// digest32 represents a partial evaluation of a 32 bites hash.
+// digest32 represents a partial evaluation of a 32 bit hash.
 type digest32 struct {
 	digest
 	seed uint32
