@@ -1,4 +1,4 @@
-package murmur3
+package murmur3_test
 
 import (
 	"crypto/rand"
@@ -11,6 +11,7 @@ import (
 	"testing/quick"
 	"unsafe"
 
+	. "github.com/twmb/murmur3"
 	"github.com/twmb/murmur3/testdata"
 )
 
@@ -47,6 +48,9 @@ func TestRef(t *testing.T) {
 		if p := fmt.Sprintf("%x", h32_byte.Sum(nil)); p != target {
 			t.Errorf("'%s': %s (want %s)", elem.s, p, target)
 		}
+		if n := h32_byte.Size(); n != 4 {
+			t.Errorf("New32: Size %d (want 4)", n)
+		}
 
 		if v := Sum32([]byte(elem.s)); v != elem.h32 {
 			t.Errorf("'%s': 0x%x (want 0x%x)", elem.s, v, elem.h32)
@@ -62,7 +66,10 @@ func TestRef(t *testing.T) {
 		h64_byte.Write([]byte(elem.s))
 		target = fmt.Sprintf("%016x", elem.h64_1)
 		if p := fmt.Sprintf("%x", h64_byte.Sum(nil)); p != target {
-			t.Errorf("Sum64: '%s': %s (want %s)", elem.s, p, target)
+			t.Errorf("New64: '%s': %s (want %s)", elem.s, p, target)
+		}
+		if n := h64_byte.Size(); n != 8 {
+			t.Errorf("New64: Size %d (want 8)", n)
 		}
 
 		if v := Sum64([]byte(elem.s)); v != elem.h64_1 {
@@ -80,6 +87,9 @@ func TestRef(t *testing.T) {
 		target = fmt.Sprintf("%016x%016x", elem.h64_1, elem.h64_2)
 		if p := fmt.Sprintf("%x", h128_byte.Sum(nil)); p != target {
 			t.Errorf("New128: '%s': %s (want %s)", elem.s, p, target)
+		}
+		if n := h128_byte.Size(); n != 16 {
+			t.Errorf("New128: Size %d (want 16)", n)
 		}
 
 		if v1, v2 := Sum128([]byte(elem.s)); v1 != elem.h64_1 || v2 != elem.h64_2 {
@@ -238,9 +248,9 @@ func TestUnaligned(t *testing.T) {
 	}
 }
 
-// TestBoundaries forces every block/tail path to be exercised for Sum32 and
-// Sum128: the block loop, the single trailing block, and every tail length,
-// across several loop iterations.
+// TestBoundaries forces every block/tail path to be exercised for Sum32,
+// Sum64, and Sum128: the block loop, the single trailing block, and every
+// tail length, across several loop iterations.
 func TestBoundaries(t *testing.T) {
 	const maxCheck = 100
 	var data [maxCheck]byte
@@ -352,6 +362,7 @@ func TestClone(t *testing.T) {
 func TestIncremental(t *testing.T) {
 	for _, elem := range data {
 		h32 := New32()
+		h64 := New64()
 		h128 := New128()
 		for i, j, k := 0, 0, len(elem.s); i < k; i = j {
 			j = 2*i + 3
@@ -360,13 +371,55 @@ func TestIncremental(t *testing.T) {
 			}
 			s := elem.s[i:j]
 			h32.Write([]byte(s))
+			h64.Write([]byte(s))
 			h128.Write([]byte(s))
 		}
 		if v := h32.Sum32(); v != elem.h32 {
 			t.Errorf("'%s': 0x%x (want 0x%x)", elem.s, v, elem.h32)
 		}
+		if v := h64.Sum64(); v != elem.h64_1 {
+			t.Errorf("New64: '%s': 0x%x (want 0x%x)", elem.s, v, elem.h64_1)
+		}
 		if v1, v2 := h128.Sum128(); v1 != elem.h64_1 || v2 != elem.h64_2 {
 			t.Errorf("'%s': 0x%x-0x%x (want 0x%x-0x%x)", elem.s, v1, v2, elem.h64_1, elem.h64_2)
+		}
+	}
+}
+
+// TestNoescape checks that the sums leave your input on the stack, and that
+// a hasher you create and use in one function stays on the stack. Only a
+// caller in another package sees the sums' allocations, so this file is
+// package murmur3_test.
+func TestNoescape(t *testing.T) {
+	// Each func declares its own buf: a buf captured from outside would
+	// move to the heap once, before AllocsPerRun counts. A string converted
+	// from more than 32 bytes allocates regardless, so b stays at 32.
+	for _, test := range []struct {
+		name string
+		fn   func(n int)
+	}{
+		{"Sum32", func(n int) { var b [32]byte; Sum32(b[:n]) }},
+		{"SeedSum32", func(n int) { var b [32]byte; SeedSum32(1, b[:n]) }},
+		{"StringSum32", func(n int) { var b [32]byte; StringSum32(string(b[:n])) }},
+		{"SeedStringSum32", func(n int) { var b [32]byte; SeedStringSum32(1, string(b[:n])) }},
+		{"Sum64", func(n int) { var b [32]byte; Sum64(b[:n]) }},
+		{"SeedSum64", func(n int) { var b [32]byte; SeedSum64(1, b[:n]) }},
+		{"StringSum64", func(n int) { var b [32]byte; StringSum64(string(b[:n])) }},
+		{"SeedStringSum64", func(n int) { var b [32]byte; SeedStringSum64(1, string(b[:n])) }},
+		{"Sum128", func(n int) { var b [32]byte; Sum128(b[:n]) }},
+		{"SeedSum128", func(n int) { var b [32]byte; SeedSum128(1, 2, b[:n]) }},
+		{"StringSum128", func(n int) { var b [32]byte; StringSum128(string(b[:n])) }},
+		{"SeedStringSum128", func(n int) { var b [32]byte; SeedStringSum128(1, 2, string(b[:n])) }},
+
+		// Two writes, so the second joins the first one's pending bytes.
+		{"New32", func(n int) { var b [32]byte; h := New32(); h.Write(b[:n]); h.Write(b[:n]); h.Sum32() }},
+		{"New64", func(n int) { var b [32]byte; h := New64(); h.Write(b[:n]); h.Write(b[:n]); h.Sum64() }},
+		{"New128", func(n int) { var b [32]byte; h := New128(); h.Write(b[:n]); h.Write(b[:n]); h.Sum128() }},
+	} {
+		for _, n := range []int{0, 3, 4, 15, 16, 17, 32} {
+			if allocs := testing.AllocsPerRun(10, func() { test.fn(n) }); allocs != 0 {
+				t.Errorf("%s, %d bytes: got %v allocs per run, want 0", test.name, n, allocs)
+			}
 		}
 	}
 }
@@ -391,7 +444,7 @@ func BenchmarkPartial32Branches(b *testing.B) {
 		b.Run(strconv.Itoa(length), func(b *testing.B) {
 			buf := make([]byte, length)
 			b.SetBytes(int64(length))
-			for b.Loop() {
+			for range b.N {
 				hasher := New32()
 				hasher.Write(buf)
 				hasher.Sum32()
@@ -477,19 +530,5 @@ func BenchmarkRandomLengths128(b *testing.B) {
 		x ^= x >> 7
 		x ^= x << 17
 		Sum128(buf[:x&63])
-	}
-}
-
-func BenchmarkNoescape32(b *testing.B) {
-	for b.Loop() {
-		var buf [8192]byte
-		Sum32(buf[:])
-	}
-}
-
-func BenchmarkNoescape128(b *testing.B) {
-	for b.Loop() {
-		var buf [8192]byte
-		Sum128(buf[:])
 	}
 }
